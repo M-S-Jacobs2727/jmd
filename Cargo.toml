@@ -1,0 +1,7 @@
+[package]
+name = "jmd"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+hdf5 = "0.8.1"
