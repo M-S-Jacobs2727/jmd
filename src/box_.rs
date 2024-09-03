@@ -87,4 +87,28 @@ impl Box_ {
     pub fn lz(&self) -> f64 {
         self.z.lo - self.z.hi
     }
+    pub fn lo(&self) -> [f64; 3] {
+        [self.x.lo, self.y.lo, self.z.lo]
+    }
+    pub fn hi(&self) -> [f64; 3] {
+        [self.x.hi, self.y.hi, self.z.hi]
+    }
+    pub fn xlo(&self) -> f64 {
+        self.x.lo
+    }
+    pub fn xhi(&self) -> f64 {
+        self.x.hi
+    }
+    pub fn ylo(&self) -> f64 {
+        self.y.lo
+    }
+    pub fn yhi(&self) -> f64 {
+        self.y.hi
+    }
+    pub fn zlo(&self) -> f64 {
+        self.z.lo
+    }
+    pub fn zhi(&self) -> f64 {
+        self.z.hi
+    }
 }
