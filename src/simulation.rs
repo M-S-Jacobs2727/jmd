@@ -63,7 +63,7 @@ impl Simulation {
         self.velocities[i] = new_vel;
     }
 
-    pub fn sort_atoms_by_bin(&mut self, bins: &neighbor::Bins) {
+    pub fn sort_atoms_by_bin(&mut self, bins: &neighbor::Grid) {
         let bin_indices = self
             .positions
             .iter()

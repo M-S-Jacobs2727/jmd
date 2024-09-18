@@ -1,5 +1,6 @@
 pub mod atomic;
 pub mod box_;
+pub mod computations;
 pub mod integrators;
 pub mod neighbor;
 pub mod simulation;
