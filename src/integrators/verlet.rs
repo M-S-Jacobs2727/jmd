@@ -1,14 +1,22 @@
 use super::Integrator;
 use crate::atomic::AtomicPotential;
-use crate::simulation::Simulation;
+use crate::atoms::Atoms;
 
-struct Verlet<T: AtomicPotential> {
+pub struct Verlet<T: AtomicPotential> {
     timestep: f64,
-    simulation: Simulation,
+    simulation: Atoms,
     atomic_potential: T,
 }
 
 impl<T: AtomicPotential> Verlet<T> {
+    pub fn new(timestep: f64, simulation: Atoms, atomic_potential: T) -> Self {
+        Self {
+            timestep,
+            simulation,
+            atomic_potential,
+        }
+    }
+
     fn increment_velocity_halfstep(&mut self, forces: &Vec<[f64; 3]>) {
         for i in 0..self.simulation.num_atoms() {
             let mass = self.simulation.masses()[i];
@@ -43,7 +51,6 @@ impl<T: AtomicPotential> Integrator for Verlet<T> {
         let forces = self.atomic_potential.compute_forces(&self.simulation);
 
         for _step in 0..num_steps {
-            self.simulation.increment_step();
             self.increment_velocity_halfstep(&forces);
             self.increment_positions();
             let forces = self.atomic_potential.compute_forces(&mut self.simulation);

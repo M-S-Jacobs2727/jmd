@@ -1,11 +1,5 @@
 use super::AtomicPotential;
-use crate::simulation::Simulation;
-use crate::type_range::TypeRange;
-
-pub struct LJCut {
-    num_types: u32,
-    coeffs: Vec<LJCutCoeff>,
-}
+use crate::{Atoms, Error};
 
 pub struct LJCutCoeff {
     sigma: f64,
@@ -38,36 +32,40 @@ impl LJCutCoeff {
     }
 }
 
-pub struct LJCutCoeffsInit {
-    types_i: TypeRange,
-    types_j: TypeRange,
-    sigma: f64,
-    epsilon: f64,
-    rcut: f64,
+pub struct LJCut {
+    num_types: u32,
+    coeffs: Vec<LJCutCoeff>,
+    type_pairs: Vec<[u32; 2]>,
 }
 impl LJCut {
-    pub fn new(passed_coeffs: &Vec<LJCutCoeffsInit>, num_types: u32) -> Self {
-        let mut coeffs: Vec<LJCutCoeff> = Vec::new();
-        for i in 0..num_types {
-            for j in 0..num_types {
-                let val = passed_coeffs.iter().find(|c| {
-                    (c.types_i.contains(i) && c.types_j.contains(j))
-                        || (c.types_i.contains(j) && c.types_j.contains(i))
-                });
-                match val {
-                    Some(coeff) => {
-                        coeffs.push(LJCutCoeff::new(coeff.sigma, coeff.epsilon, coeff.rcut));
-                    },
-                    None => panic!("Coefficient list passed to LJCut::new is missing values for type pair ({i}, {j})"),
-                };
-            }
+    pub fn new() -> Self {
+        Self {
+            num_types: 0,
+            coeffs: Vec::new(),
+            type_pairs: Vec::new(),
         }
-        Self { num_types, coeffs }
+    }
+    pub fn add_coeff(
+        &mut self,
+        type_i: u32,
+        type_j: u32,
+        sigma: f64,
+        epsilon: f64,
+        rcut: f64,
+    ) -> Result<(), Error> {
+        if self.type_pairs.contains(&[type_i, type_j])
+            || self.type_pairs.contains(&[type_j, type_i])
+        {
+            return Err(Error::AtomicPotentialError {});
+        }
+        self.type_pairs.push([type_i, type_j]);
+        self.coeffs.push(LJCutCoeff::new(sigma, epsilon, rcut));
+        Ok(())
     }
 }
 
 impl AtomicPotential for LJCut {
-    fn compute_forces(&self, sim: &Simulation) -> Vec<[f64; 3]> {
+    fn compute_forces(&self, sim: &Atoms) -> Vec<[f64; 3]> {
         let mut forces: Vec<[f64; 3]> = Vec::new();
         forces.resize(sim.num_atoms(), [0.0, 0.0, 0.0]);
         for i in 0..sim.num_atoms() - 1 {

@@ -32,6 +32,33 @@ impl Rect {
             zhi: box_.zhi(),
         }
     }
+    pub fn xlo(&self) -> f64 {
+        self.xlo
+    }
+    pub fn xhi(&self) -> f64 {
+        self.xhi
+    }
+    pub fn ylo(&self) -> f64 {
+        self.ylo
+    }
+    pub fn yhi(&self) -> f64 {
+        self.yhi
+    }
+    pub fn zlo(&self) -> f64 {
+        self.zlo
+    }
+    pub fn zhi(&self) -> f64 {
+        self.zhi
+    }
+    pub fn lx(&self) -> f64 {
+        self.xhi - self.xlo
+    }
+    pub fn ly(&self) -> f64 {
+        self.yhi - self.ylo
+    }
+    pub fn lz(&self) -> f64 {
+        self.zhi - self.zlo
+    }
 }
 impl Region for Rect {
     fn contains(&self, coord: &[f64; 3]) -> bool {
@@ -44,7 +71,7 @@ impl Region for Rect {
     }
     fn add_random_atoms(
         &self,
-        sim: &mut super::Simulation,
+        sim: &mut super::Atoms,
         num_atoms: usize,
         atom_type: u32,
         mass: f64,
@@ -61,9 +88,9 @@ impl Region for Rect {
             sim.masses.push(mass);
             sim.velocities.push([0.0, 0.0, 0.0]);
             sim.positions.push([
-                rand::random::<f64>() * sim.box_.lx() + sim.box_.xlo(),
-                rand::random::<f64>() * sim.box_.ly() + sim.box_.ylo(),
-                rand::random::<f64>() * sim.box_.lz() + sim.box_.zlo(),
+                rand::random::<f64>() * self.lx() + self.xlo,
+                rand::random::<f64>() * self.ly() + self.ylo,
+                rand::random::<f64>() * self.lz() + self.zlo,
             ])
         }
     }

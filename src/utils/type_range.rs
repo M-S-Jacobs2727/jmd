@@ -31,4 +31,16 @@ impl TypeRange {
         }
         true
     }
+    pub fn max(&self) -> Option<u32> {
+        match self.end {
+            CoeffType::Value(x) => Some(x),
+            CoeffType::Span => None,
+        }
+    }
+    pub fn min(&self) -> Option<u32> {
+        match self.begin {
+            CoeffType::Value(x) => Some(x),
+            CoeffType::Span => None,
+        }
+    }
 }
