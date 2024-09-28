@@ -1,4 +1,4 @@
-use crate::computations::distance;
+use crate::computations::distance_squared;
 use crate::neighbor::Grid;
 
 pub struct NeighborList {
@@ -118,7 +118,9 @@ impl NeighborList {
                 ];
                 let comp_bin_linear = self.grid.bin_idx_from_3d_idx(&comp_bin);
                 for &neigh_idx in &atom_indices_per_bin[comp_bin_linear] {
-                    if distance(&positions[neigh_idx], pos) < self.neighbor_distance() {
+                    if distance_squared(&positions[neigh_idx], pos)
+                        < self.neighbor_distance() * self.neighbor_distance()
+                    {
                         self.neighbors[i].push(neigh_idx);
                     }
                 }

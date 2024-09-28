@@ -11,7 +11,7 @@ struct Verlet<T: AtomicPotential> {
 impl<T: AtomicPotential> Verlet<T> {
     fn increment_velocity_halfstep(&mut self, forces: &Vec<[f64; 3]>) {
         for i in 0..self.simulation.num_atoms() {
-            let mass = self.simulation.mass(i);
+            let mass = self.simulation.masses()[i];
             self.simulation.increment_velocity(
                 i,
                 [
@@ -25,7 +25,7 @@ impl<T: AtomicPotential> Verlet<T> {
 
     fn increment_positions(&mut self) {
         for i in 0..self.simulation.num_atoms() {
-            let vel = self.simulation.velocity(i);
+            let vel = self.simulation.velocities()[i];
             self.simulation.increment_position(
                 i,
                 [

@@ -81,10 +81,10 @@ impl AtomicPotential for LJCut {
                 // f(r_ij) = r_ij * -24 eps / sig^2, so if r_ij = r_j - r_i = (sig, 0),
                 // then f_i = f(r_ij) and f_j = -f(r_ij)
 
-                let idx = self.type_index(sim.type_(i), sim.type_(j));
+                let idx = self.type_index(sim.types()[i], sim.types()[j]);
                 let coeff = &self.coeffs[idx];
-                let pos_i = sim.position(i);
-                let pos_j = sim.position(j);
+                let pos_i = sim.positions()[i];
+                let pos_j = sim.positions()[j];
                 let r = [
                     pos_i[0] - pos_j[0],
                     pos_i[1] - pos_j[1],

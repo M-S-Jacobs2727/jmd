@@ -1,18 +1,31 @@
 use crate::{box_::Box_, neighbor, sort};
 
 pub struct Simulation {
-    step: u64,
-    box_: Box_,
-    ghost_atom_ref_indices: Vec<usize>,
-    ids: Vec<u64>,
-    types: Vec<u32>,
-    // group_mask: Vec<u32>,
-    positions: Vec<[f64; 3]>,
-    velocities: Vec<[f64; 3]>,
-    masses: Vec<f64>,
-    bin_indices: Vec<usize>,
+    pub step: u64,
+    pub box_: Box_,
+    pub ghost_atom_ref_indices: Vec<usize>,
+    pub ids: Vec<usize>,
+    pub types: Vec<u32>,
+    // pub group_mask: Vec<u32>,
+    pub positions: Vec<[f64; 3]>,
+    pub velocities: Vec<[f64; 3]>,
+    pub masses: Vec<f64>,
+    pub bin_indices: Vec<usize>,
 }
 impl Simulation {
+    pub fn new(box_: Box_) -> Self {
+        Simulation {
+            step: 0,
+            box_,
+            ghost_atom_ref_indices: Vec::new(),
+            ids: Vec::new(),
+            types: Vec::new(),
+            positions: Vec::new(),
+            velocities: Vec::new(),
+            masses: Vec::new(),
+            bin_indices: Vec::new(),
+        }
+    }
     pub fn num_atoms(&self) -> usize {
         self.ids.len()
     }
@@ -25,23 +38,23 @@ impl Simulation {
     pub fn box_(&self) -> &Box_ {
         &self.box_
     }
-    pub fn id(&self, i: usize) -> u64 {
-        self.ids[i]
+    pub fn ids(&self) -> &Vec<usize> {
+        &self.ids
     }
-    pub fn id_to_idx(&self, id: u64) -> Option<usize> {
-        self.ids.iter().position(|&x| x == id)
+    pub fn id_to_idx(&self, id: usize) -> Option<usize> {
+        self.ids.iter().position(|x| *x == id)
     }
-    pub fn type_(&self, i: usize) -> u32 {
-        self.types[i]
+    pub fn types(&self) -> &Vec<u32> {
+        &self.types
     }
-    pub fn position(&self, i: usize) -> &[f64; 3] {
-        &self.positions[i]
+    pub fn positions(&self) -> &Vec<[f64; 3]> {
+        &self.positions
     }
-    pub fn velocity(&self, i: usize) -> &[f64; 3] {
-        &self.velocities[i]
+    pub fn velocities(&self) -> &Vec<[f64; 3]> {
+        &self.velocities
     }
-    pub fn mass(&self, i: usize) -> f64 {
-        self.masses[i]
+    pub fn masses(&self) -> &Vec<f64> {
+        &self.masses
     }
     pub fn increment_step(&mut self) {
         self.step += 1;
@@ -67,11 +80,11 @@ impl Simulation {
         let bin_indices = self
             .positions
             .iter()
-            .map(|coord| bins.coord_to_bin_idx(coord))
+            .map(|coord| bins.bin_idx_from_3d_idx(&bins.coord_to_3d_idx(coord)))
             .collect();
         let sort_indices = sort::get_sort_indices(&bin_indices);
 
-        sort::sort_atoms(&sort_indices, &mut self.ids, 0u64);
+        sort::sort_atoms(&sort_indices, &mut self.ids, 0usize);
         sort::sort_atoms(&sort_indices, &mut self.types, 0u32);
         sort::sort_atoms(&sort_indices, &mut self.positions, [0.0f64, 0.0, 0.0]);
         sort::sort_atoms(&sort_indices, &mut self.velocities, [0.0f64, 0.0, 0.0]);
@@ -80,7 +93,7 @@ impl Simulation {
         self.bin_indices = self
             .positions
             .iter()
-            .map(|coord| bins.coord_to_bin_idx(coord))
+            .map(|coord| bins.bin_idx_from_3d_idx(&bins.coord_to_3d_idx(coord)))
             .collect();
     }
 }
