@@ -1,7 +1,7 @@
 pub mod rect;
 pub use rect::Rect;
 
-pub use crate::Atoms;
+use crate::Atoms;
 
 pub trait Region {
     fn contains(&self, coord: &[f64; 3]) -> bool;

@@ -1,12 +1,15 @@
-use crate::computations::distance_squared;
-use crate::neighbor::Grid;
+use super::{Grid, NeighborUpdateSettings};
+
+use crate::{utils::distance_squared, Box_};
 
 pub struct NeighborList {
     grid: Grid,
     force_distance: f64,
     skin_distance: f64,
+    neighbor_distance: f64,
     stencil: Vec<[i32; 3]>,
     neighbors: Vec<Vec<usize>>,
+    pub update_settings: NeighborUpdateSettings,
 }
 fn compute_stencil(bin_size: f64, cutoff_distance: f64) -> Vec<[i32; 3]> {
     let max_number_out = (cutoff_distance / bin_size).ceil() as i32;
@@ -54,8 +57,8 @@ fn bin_atoms(grid: &Grid, positions: &Vec<[f64; 3]>) -> Vec<Vec<usize>> {
 }
 
 impl NeighborList {
-    pub fn new(num_atoms: usize, grid: Grid, force_distance: f64, skin_distance: f64) -> Self {
-        let mut neighbors: Vec<Vec<usize>> = Vec::new();
+    pub fn new(box_: &Box_, bin_size: f64, force_distance: f64, skin_distance: f64) -> Self {
+        let neighbors: Vec<Vec<usize>> = Vec::new();
         assert!(
             force_distance > 0.0,
             "Force cutoff distance must be positive"
@@ -64,44 +67,39 @@ impl NeighborList {
             skin_distance > 0.0,
             "Neighbor skin distance must be positive"
         );
-        neighbors.resize(num_atoms, Vec::new());
-        let stencil = compute_stencil(grid.bin_size(), force_distance + skin_distance);
+        let cutoff_distance = force_distance + skin_distance;
+        let grid = Grid::new(box_, bin_size, cutoff_distance);
+        let stencil = compute_stencil(grid.bin_size(), cutoff_distance);
         Self {
             grid,
             force_distance,
             skin_distance,
+            neighbor_distance: cutoff_distance,
             stencil,
             neighbors,
+            update_settings: NeighborUpdateSettings::new(),
         }
     }
     pub fn neighbors(&self) -> &Vec<Vec<usize>> {
         &self.neighbors
     }
     pub fn force_distance(&self) -> f64 {
-        self.force_distance
+        self.force_distance.clone()
     }
     pub fn skin_distance(&self) -> f64 {
-        self.skin_distance
+        self.skin_distance.clone()
     }
     pub fn neighbor_distance(&self) -> f64 {
-        self.skin_distance + self.force_distance
+        self.neighbor_distance.clone()
     }
     pub fn grid(&self) -> &Grid {
         &self.grid
     }
-    pub fn update(&mut self, positions: &Vec<[f64; 3]>, bin_numbers: &Vec<usize>) {
+    pub fn update(&mut self, positions: &Vec<[f64; 3]>) {
         let num_atoms = positions.len();
         assert!(
-            num_atoms == bin_numbers.len() && num_atoms == self.neighbors.len(),
+            num_atoms == self.neighbors.len(),
             "Number of atoms in positions vector and bin_numbers vector should be equal"
-        );
-        assert!(
-            bin_numbers
-                .iter()
-                .take(num_atoms - 1)
-                .zip(bin_numbers.iter().skip(1))
-                .all(|(i, j)| i <= j),
-            "Atoms should be sorted before updating neighbor list"
         );
 
         self.neighbors.clear();

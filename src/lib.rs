@@ -3,12 +3,17 @@ pub mod atoms;
 pub mod box_;
 pub mod error;
 pub mod integrators;
+pub mod jmd;
 pub mod neighbor;
+pub mod parallel;
 pub mod region;
 pub mod utils;
 
 pub use atomic::*;
 pub use atoms::Atoms;
+pub use box_::Box_;
 pub use error::Error;
 pub use integrators::*;
-pub use utils::*;
+pub use jmd::Jmd;
+pub use neighbor::NeighborList;
+pub use parallel::worker::ThreadIds;

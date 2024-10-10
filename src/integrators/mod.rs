@@ -1,5 +1,8 @@
+use crate::{parallel::Simulation, AtomicPotential};
+
 pub mod verlet;
 
-pub trait Integrator {
-    fn run(&mut self, num_steps: u64);
+pub trait Integrator<P: AtomicPotential> {
+    fn new(simulation: Simulation<P>) -> Self;
+    fn run(&mut self, num_steps: usize);
 }

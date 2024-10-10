@@ -1,4 +1,4 @@
-use crate::box_::Box_;
+use crate::Box_;
 
 pub struct Grid {
     lo_corner: [f64; 3],
@@ -11,8 +11,8 @@ impl Grid {
     pub fn new(box_: &Box_, bin_size: f64, cutoff_distance: f64) -> Self {
         assert!(bin_size > 0.0, "Bin size must be positive");
         assert!(
-            bin_size < (box_.lx().min(box_.ly()).min(box_.lz())),
-            "Bin size must be less than the smallest box length"
+            bin_size < 0.5 * (box_.lx().min(box_.ly()).min(box_.lz())),
+            "Bin size must be less than half the smallest box length"
         );
         let lo_corner = [
             box_.xlo() - cutoff_distance,

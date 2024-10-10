@@ -1,4 +1,4 @@
-use crate::{neighbor, sort};
+use crate::{neighbor, utils};
 
 pub struct Atoms {
     pub ids: Vec<usize>,
@@ -58,13 +58,13 @@ impl Atoms {
             .iter()
             .map(|coord| bins.bin_idx_from_3d_idx(&bins.coord_to_3d_idx(coord)))
             .collect();
-        let sort_indices = sort::get_sort_indices(&bin_indices);
+        let sort_indices = utils::get_sort_indices(&bin_indices);
 
-        sort::sort_atoms(&sort_indices, &mut self.ids, 0usize);
-        sort::sort_atoms(&sort_indices, &mut self.types, 0u32);
-        sort::sort_atoms(&sort_indices, &mut self.positions, [0.0f64, 0.0, 0.0]);
-        sort::sort_atoms(&sort_indices, &mut self.velocities, [0.0f64, 0.0, 0.0]);
-        sort::sort_atoms(&sort_indices, &mut self.masses, 0.0f64);
+        utils::sort_atoms(&sort_indices, &mut self.ids, 0usize);
+        utils::sort_atoms(&sort_indices, &mut self.types, 0u32);
+        utils::sort_atoms(&sort_indices, &mut self.positions, [0.0f64, 0.0, 0.0]);
+        utils::sort_atoms(&sort_indices, &mut self.velocities, [0.0f64, 0.0, 0.0]);
+        utils::sort_atoms(&sort_indices, &mut self.masses, 0.0f64);
 
         return self
             .positions

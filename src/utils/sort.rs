@@ -1,4 +1,5 @@
 use std::mem::swap;
+
 pub fn get_sort_indices(bin_indices: &Vec<usize>) -> Vec<usize> {
     if bin_indices.is_empty() {
         return Vec::new();

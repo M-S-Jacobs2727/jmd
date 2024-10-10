@@ -1,6 +1,6 @@
-use crate::box_::Box_;
-
 use super::Region;
+use crate::Box_;
+
 use rand;
 
 pub struct Rect {
