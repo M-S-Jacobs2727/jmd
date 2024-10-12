@@ -1,11 +1,11 @@
-pub struct NeighborUpdateSettings {
+pub struct UpdateSettings {
     pub every: usize,
     pub delay: usize,
     pub check: bool,
     last_update_step: usize,
 }
 
-impl NeighborUpdateSettings {
+impl UpdateSettings {
     pub fn new() -> Self {
         Self {
             every: 1,

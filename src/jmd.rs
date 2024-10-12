@@ -1,3 +1,5 @@
+// TODO: add more to handle_messages
+
 use std::sync::mpsc;
 use std::thread;
 
@@ -41,12 +43,22 @@ impl Jmd {
         }
     }
     fn handle_messages(&self) -> Result<(), Error> {
+        let mut threads_complete = 0;
         loop {
             let message = self.rx.recv().expect("All procs disconnected");
             match message {
                 W2M::Error(e) => return Err(e),
-                W2M::Complete => return Ok(()),
+                W2M::Complete => threads_complete += 1,
+                W2M::ProcDims(pd) => {
+                    for t in &self.threads {
+                        t.send(M2W::ProcDims(pd.clone()));
+                    }
+                }
+                W2M::Sender(tx, idx) => self.threads[idx].send(M2W::Sender(tx)).unwrap(),
                 _ => {}
+            };
+            if threads_complete == self.threads.len() {
+                return Ok(());
             }
         }
     }

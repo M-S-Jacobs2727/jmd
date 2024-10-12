@@ -1,4 +1,4 @@
-use super::{Grid, NeighborUpdateSettings};
+use super::{Grid, UpdateSettings};
 
 use crate::{utils::distance_squared, Box_};
 
@@ -9,7 +9,7 @@ pub struct NeighborList {
     neighbor_distance: f64,
     stencil: Vec<[i32; 3]>,
     neighbors: Vec<Vec<usize>>,
-    pub update_settings: NeighborUpdateSettings,
+    pub update_settings: UpdateSettings,
 }
 fn compute_stencil(bin_size: f64, cutoff_distance: f64) -> Vec<[i32; 3]> {
     let max_number_out = (cutoff_distance / bin_size).ceil() as i32;
@@ -77,7 +77,7 @@ impl NeighborList {
             neighbor_distance: cutoff_distance,
             stencil,
             neighbors,
-            update_settings: NeighborUpdateSettings::new(),
+            update_settings: UpdateSettings::new(),
         }
     }
     pub fn neighbors(&self) -> &Vec<Vec<usize>> {

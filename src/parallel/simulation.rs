@@ -1,6 +1,6 @@
 use std::rc::Rc;
-
-use super::{AtomInfo, Communicator, NeighborDirection};
+// TODO: update comm, remove args from new, add init?
+use super::{AtomInfo, Domain, NeighborDirection};
 use crate::{
     box_::PBC,
     region::{Rect, Region},
@@ -13,13 +13,13 @@ pub struct Simulation<P: AtomicPotential> {
     domain: Rect,
     atomic_potential: P,
     neighbor_list: NeighborList,
-    comm: Rc<Communicator<AtomInfo>>,
+    comm: Rc<Domain<AtomInfo>>,
     nlocal: usize,
     max_distance_sq: f64,
 }
 
 impl<P: AtomicPotential> Simulation<P> {
-    pub fn new(comm: Rc<Communicator<AtomInfo>>) -> Self {
+    pub fn new(comm: Rc<Domain<AtomInfo>>) -> Self {
         let box_ = Box_::new(0., 10., 0.0, 10.0, 0.0, 10.0, PBC::PP, PBC::PP, PBC::PP);
         let domain = box_.subdomain(comm.distribution_info());
         let neighbor_list = NeighborList::new(&box_, 1.0, 1.0, 1.0);

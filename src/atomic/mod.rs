@@ -1,6 +1,8 @@
 pub mod ljcut;
 pub mod none;
 
+pub use ljcut::{LJCut, LJCutCoeff};
+
 use crate::Atoms;
 
 pub trait AtomicPotential {

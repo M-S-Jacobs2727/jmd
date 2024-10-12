@@ -69,6 +69,8 @@ impl Region for Rect {
             && self.zlo <= coord[2]
             && coord[2] <= self.zhi
     }
+    // Move this to atoms, takes Region
+    // Add function for get_random_coord
     fn add_random_atoms(
         &self,
         sim: &mut super::Atoms,

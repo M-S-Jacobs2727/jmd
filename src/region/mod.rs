@@ -1,6 +1,7 @@
 pub mod rect;
 pub use rect::Rect;
-
+// TODO: change add_random_atoms to get_random_coord
+// TODO: move add_random_atoms to Atoms struct
 use crate::Atoms;
 
 pub trait Region {

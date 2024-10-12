@@ -1,6 +1,6 @@
-pub mod communication;
+pub mod domain;
 pub mod simulation;
 pub mod worker;
 
-pub use communication::{AtomInfo, Communicator, NeighborDirection};
+pub use domain::{AtomInfo, Domain, NeighborDirection};
 pub use simulation::Simulation;

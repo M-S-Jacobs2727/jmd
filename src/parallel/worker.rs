@@ -13,13 +13,15 @@ pub enum W2M {
     Output(String),
     Dump(Atoms, Box_),
     Id(thread::ThreadId),
-    Sender(mpsc::Sender<AtomInfo>),
+    Sender(Option<mpsc::Sender<AtomInfo>>, usize),
+    ProcDims([usize; 3]),
 }
 pub enum M2W {
     Error(Error),
     Setup(Vec<thread::ThreadId>),
     Run(fn(&mut Worker) -> ()),
-    Sender(mpsc::Sender<AtomInfo>),
+    Sender(Option<mpsc::Sender<AtomInfo>>),
+    ProcDims([usize; 3]),
 }
 pub struct Worker {
     rx: mpsc::Receiver<M2W>,
@@ -52,5 +54,21 @@ impl Worker {
             M2W::Error(_) => return,
             _ => panic!("Invalid communication"),
         };
+    }
+    pub fn thread_ids(&self) -> &Vec<ThreadId> {
+        &self.thread_ids
+    }
+    pub fn send(&self, message: W2M) -> Result<(), mpsc::SendError<W2M>> {
+        self.tx.send(message)
+    }
+    pub fn recv(&self) -> Result<M2W, mpsc::RecvError> {
+        self.rx.recv()
+    }
+    pub fn try_recv(&self) -> Result<M2W, mpsc::TryRecvError> {
+        self.rx.try_recv()
+    }
+
+    pub fn error(&self, e: Error) {
+        self.send(W2M::Error(e)).unwrap();
     }
 }

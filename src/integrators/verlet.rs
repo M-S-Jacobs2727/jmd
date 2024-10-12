@@ -1,5 +1,5 @@
 use super::Integrator;
-use crate::{parallel::Simulation, AtomicPotential};
+use crate::{AtomicPotential, Simulation};
 
 pub struct Verlet<P: AtomicPotential> {
     timestep: f64,
