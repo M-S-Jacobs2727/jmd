@@ -76,6 +76,4 @@ impl Region for Rect {
             rand::random::<f64>() * self.lz() + self.zlo,
         ]
     }
-    // Move this to atoms, takes Region
-    // Add function for get_random_coord
 }
