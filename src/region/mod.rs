@@ -4,6 +4,7 @@ pub use rect::Rect;
 // TODO: move add_random_atoms to Atoms struct
 use crate::Atoms;
 
+/// A region of the simulation space
 pub trait Region {
     fn contains(&self, coord: &[f64; 3]) -> bool;
     fn add_random_atoms(&self, sim: &mut Atoms, num_atoms: usize, atom_type: u32, mass: f64);

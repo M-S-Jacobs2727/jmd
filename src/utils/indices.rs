@@ -1,5 +1,6 @@
 use crate::Error;
 
+/// Three-dimensional index, convertible to a one-dimensional index
 pub struct Index3D {
     x: usize,
     y: usize,
@@ -26,7 +27,7 @@ impl Index3D {
         }
     }
 }
-
+/// One-dimensional index, convertible to a three-dimensional index
 pub struct Index1D {
     i: usize,
 }

@@ -2,6 +2,7 @@ pub enum CoeffType {
     Value(u32),
     Span,
 }
+/// Used for
 pub struct TypeRange {
     begin: CoeffType,
     end: CoeffType,

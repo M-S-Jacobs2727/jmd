@@ -23,6 +23,7 @@ impl AtomInfo {
     }
 }
 
+/// Transform a linear index of a L*M*N vector to a 3D index of a LxMxN array
 fn multi_to_linear(idx: &[usize; 3], lengths: &[usize; 3]) -> usize {
     let [x, y, z] = &idx;
     let [nx, ny, nz] = &lengths;
@@ -32,6 +33,7 @@ fn multi_to_linear(idx: &[usize; 3], lengths: &[usize; 3]) -> usize {
     );
     x * ny * nz + y * nz + z
 }
+/// Transform a 3D index of a LxMxN array to a linear index of a L*M*N vector
 fn linear_to_multi(idx: usize, lengths: &[usize; 3]) -> [usize; 3] {
     let [nx, ny, nz] = &lengths;
     assert!(
@@ -150,6 +152,7 @@ impl NeighborDirection {
 //     }
 // }
 
+/// Message transmitters to the six neighboring processes
 pub struct NeighborProcs<AtomInfo> {
     xlo: Option<mpsc::Sender<AtomInfo>>,
     xhi: Option<mpsc::Sender<AtomInfo>>,
@@ -190,6 +193,8 @@ fn all_factors(n: &usize) -> Vec<usize> {
     (2..n + 1).filter(|i| n % i == 0).collect()
 }
 // TODO: Finish this function
+/// Determine and return the best configuration of processes to
+/// reduce surface area for communication
 fn procs_in_box(nprocs: usize, lx: f64, ly: f64, lz: f64) -> [usize; 3] {
     // n1 * n2 * n3 = N, lx * ly * lz = V
     // ni = curt(N/V) * li
@@ -213,6 +218,7 @@ fn procs_in_box(nprocs: usize, lx: f64, ly: f64, lz: f64) -> [usize; 3] {
     todo!()
 }
 
+/// Represents a process in relation to the other neighboring processes
 pub struct Domain {
     receiver: mpsc::Receiver<AtomInfo>,
     my_sender: mpsc::Sender<AtomInfo>,
@@ -408,12 +414,12 @@ impl Domain {
         };
         if across_box {
             let periodic = match direction {
-                NeighborDirection::Xlo => box_.x().pbc().is_periodic(),
-                NeighborDirection::Xhi => box_.x().pbc().is_periodic(),
-                NeighborDirection::Ylo => box_.y().pbc().is_periodic(),
-                NeighborDirection::Yhi => box_.y().pbc().is_periodic(),
-                NeighborDirection::Zlo => box_.z().pbc().is_periodic(),
-                NeighborDirection::Zhi => box_.z().pbc().is_periodic(),
+                NeighborDirection::Xlo => box_.x().bc().is_periodic(),
+                NeighborDirection::Xhi => box_.x().bc().is_periodic(),
+                NeighborDirection::Ylo => box_.y().bc().is_periodic(),
+                NeighborDirection::Yhi => box_.y().bc().is_periodic(),
+                NeighborDirection::Zlo => box_.z().bc().is_periodic(),
+                NeighborDirection::Zhi => box_.z().bc().is_periodic(),
             };
             if periodic {
                 Some(possible_neighbor)

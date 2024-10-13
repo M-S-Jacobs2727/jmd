@@ -7,12 +7,12 @@ use crate::{
     parallel::worker::{Worker, M2W, W2M},
     Error,
 };
+/// Main app, used to run a function through parallel workers
 pub struct Jmd {
     rx: mpsc::Receiver<W2M>,
     tx: mpsc::Sender<W2M>,
     threads: Vec<mpsc::Sender<M2W>>,
 }
-
 impl Jmd {
     pub fn new() -> Self {
         let (tx, rx) = mpsc::channel();

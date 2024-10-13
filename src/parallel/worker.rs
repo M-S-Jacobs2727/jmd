@@ -7,6 +7,7 @@ use crate::{parallel::AtomInfo, Atoms, Box_, Error};
 
 pub type ThreadIds = Vec<ThreadId>;
 
+/// Worker-to-Manager messages
 pub enum W2M {
     Error(Error),
     Complete,
@@ -16,6 +17,7 @@ pub enum W2M {
     Sender(Option<mpsc::Sender<AtomInfo>>, usize),
     ProcDims([usize; 3]),
 }
+/// Manager-to-Worker messages
 pub enum M2W {
     Error(Error),
     Setup(Vec<thread::ThreadId>),
@@ -23,6 +25,7 @@ pub enum M2W {
     Sender(Option<mpsc::Sender<AtomInfo>>),
     ProcDims([usize; 3]),
 }
+/// Channels for communication between each process and the manager
 pub struct Worker {
     rx: mpsc::Receiver<M2W>,
     tx: mpsc::Sender<W2M>,

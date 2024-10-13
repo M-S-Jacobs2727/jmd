@@ -1,6 +1,7 @@
 use super::Integrator;
 use crate::{AtomicPotential, Simulation};
 
+/// Velocity-verlet integrator
 pub struct Verlet<P: AtomicPotential> {
     timestep: f64,
     simulation: Simulation<P>,
@@ -13,7 +14,7 @@ impl<'a, P: AtomicPotential> Verlet<P> {
             simulation,
         }
     }
-
+    /// Steps the velocities of the simulation by half a timestep
     fn increment_velocity_halfstep(&mut self, forces: &Vec<[f64; 3]>) {
         for i in 0..self.simulation.atoms.num_atoms() {
             let mass = self.simulation.atoms.masses()[i];
@@ -27,7 +28,7 @@ impl<'a, P: AtomicPotential> Verlet<P> {
             );
         }
     }
-
+    /// Steps the positions of the simulation forward
     fn increment_positions(&mut self) {
         for i in 0..self.simulation.atoms.num_atoms() {
             let vel = self.simulation.atoms.velocities()[i];

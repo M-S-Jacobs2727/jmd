@@ -1,3 +1,4 @@
+/// Settings for computing and updating a neighbor list
 pub struct UpdateSettings {
     pub every: usize,
     pub delay: usize,

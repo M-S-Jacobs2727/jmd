@@ -31,7 +31,8 @@ impl LJCutCoeff {
         self.rcut
     }
 }
-
+// TODO: add support for ranges
+/// Lennard-Jones 12-6 potential
 pub struct LJCut {
     num_types: u32,
     coeffs: Vec<LJCutCoeff>,
@@ -49,7 +50,7 @@ impl LJCut {
         if self.type_pairs.contains(&[type_i, type_j])
             || self.type_pairs.contains(&[type_j, type_i])
         {
-            return Err(Error::AtomicPotentialError {});
+            return Err(Error::AtomicPotentialError);
         }
         self.type_pairs.push([type_i, type_j]);
         self.coeffs.push(LJCutCoeff::new(sigma, epsilon, rcut));

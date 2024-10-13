@@ -1,5 +1,12 @@
 // TODO: add is_periodic function to Box, taking NeighborDirection
-pub enum PBC {
+
+/// Boundary conditions for simulation box.
+///
+/// P: Periodic (must be set for both sides)
+/// F: Fixed boundary
+/// S: Shrink-wrapped boundary
+/// M: Shrink-wrapped boundary with a minimum
+pub enum BC {
     PP,
     FF,
     FM,
@@ -11,26 +18,26 @@ pub enum PBC {
     SM,
     SS,
 }
-impl PBC {
+impl BC {
     pub fn is_periodic(&self) -> bool {
         match self {
-            PBC::PP => true,
+            BC::PP => true,
             _ => false,
         }
     }
 }
-
+/// Upper and lower boundary with boundary conditions
 pub struct Bounds {
     lo: f64,
     hi: f64,
-    pbc: PBC,
+    bc: BC,
 }
 impl Bounds {
-    pub fn new(lo: f64, hi: f64, pbc: PBC) -> Self {
+    pub fn new(lo: f64, hi: f64, bc: BC) -> Self {
         if hi <= lo {
             panic!("Lower bounds should be less than upper bounds");
         }
-        Self { lo, hi, pbc }
+        Self { lo, hi, bc }
     }
     pub fn lo(&self) -> f64 {
         self.lo
@@ -38,11 +45,11 @@ impl Bounds {
     pub fn hi(&self) -> f64 {
         self.hi
     }
-    pub fn pbc(&self) -> &PBC {
-        &self.pbc
+    pub fn bc(&self) -> &BC {
+        &self.bc
     }
 }
-
+/// Simulation box, represented by x, y, and z Bounds
 pub struct Box_ {
     x: Bounds,
     y: Bounds,
@@ -57,25 +64,25 @@ impl Box_ {
         yhi: f64,
         zlo: f64,
         zhi: f64,
-        xpbc: PBC,
-        ypbc: PBC,
-        zpbc: PBC,
+        xpbc: BC,
+        ypbc: BC,
+        zpbc: BC,
     ) -> Self {
         Self {
             x: Bounds {
                 lo: xlo,
                 hi: xhi,
-                pbc: xpbc,
+                bc: xpbc,
             },
             y: Bounds {
                 lo: ylo,
                 hi: yhi,
-                pbc: ypbc,
+                bc: ypbc,
             },
             z: Bounds {
                 lo: zlo,
                 hi: zhi,
-                pbc: zpbc,
+                bc: zpbc,
             },
         }
     }

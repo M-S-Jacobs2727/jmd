@@ -2,6 +2,7 @@ use super::{Grid, UpdateSettings};
 
 use crate::{utils::distance_squared, Box_};
 
+/// Used for computing a list of neighboring particles
 pub struct NeighborList {
     grid: Grid,
     force_distance: f64,

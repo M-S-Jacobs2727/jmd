@@ -17,7 +17,7 @@ pub mod utils;
 
 pub use atomic::*;
 pub use atoms::Atoms;
-pub use box_::{Box_, PBC};
+pub use box_::{Box_, BC};
 pub use error::Error;
 pub use integrators::*;
 pub use jmd::Jmd;

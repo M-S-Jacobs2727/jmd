@@ -1,5 +1,5 @@
 use crate::{neighbor, utils};
-
+/// Atom properties during simulation, not including forces
 pub struct Atoms {
     pub ids: Vec<usize>,
     pub types: Vec<u32>,

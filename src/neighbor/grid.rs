@@ -1,5 +1,6 @@
 use crate::Box_;
 
+/// Neighbor list grid of bins
 pub struct Grid {
     lo_corner: [f64; 3],
     hi_corner: [f64; 3],

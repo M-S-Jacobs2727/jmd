@@ -2,7 +2,7 @@ use super::Region;
 use crate::Box_;
 
 use rand;
-
+/// Rectangular prism region
 pub struct Rect {
     xlo: f64,
     xhi: f64,
