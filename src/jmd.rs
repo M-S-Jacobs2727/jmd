@@ -51,7 +51,7 @@ impl Jmd {
                 W2M::Complete => threads_complete += 1,
                 W2M::ProcDims(pd) => {
                     for t in &self.threads {
-                        t.send(M2W::ProcDims(pd.clone()));
+                        t.send(M2W::ProcDims(pd.clone())).unwrap();
                     }
                 }
                 W2M::Sender(tx, idx) => self.threads[idx].send(M2W::Sender(tx)).unwrap(),

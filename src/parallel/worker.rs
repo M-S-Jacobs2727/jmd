@@ -3,7 +3,7 @@ use std::{
     thread::{self, ThreadId},
 };
 
-use crate::{parallel::AtomInfo, Atoms, Box_, Error};
+use crate::{parallel::AtomInfo, Atoms, Container, Error};
 
 pub type ThreadIds = Vec<ThreadId>;
 
@@ -12,7 +12,7 @@ pub enum W2M {
     Error(Error),
     Complete,
     Output(String),
-    Dump(Atoms, Box_),
+    Dump(Atoms, Container),
     Id(thread::ThreadId),
     Sender(Option<mpsc::Sender<AtomInfo>>, usize),
     ProcDims([usize; 3]),

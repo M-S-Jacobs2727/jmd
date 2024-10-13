@@ -1,5 +1,5 @@
 use super::Region;
-use crate::Box_;
+use crate::Container;
 
 use rand;
 /// Rectangular prism region
@@ -22,14 +22,14 @@ impl Rect {
             zhi,
         }
     }
-    pub fn from_box(box_: &Box_) -> Self {
+    pub fn from_box(container: &Container) -> Self {
         Self {
-            xlo: box_.xlo(),
-            xhi: box_.xhi(),
-            ylo: box_.ylo(),
-            yhi: box_.yhi(),
-            zlo: box_.zlo(),
-            zhi: box_.zhi(),
+            xlo: container.xlo(),
+            xhi: container.xhi(),
+            ylo: container.ylo(),
+            yhi: container.yhi(),
+            zlo: container.zlo(),
+            zhi: container.zhi(),
         }
     }
     pub fn xlo(&self) -> f64 {

@@ -1,4 +1,4 @@
-use crate::Box_;
+use crate::Container;
 
 /// Neighbor list grid of bins
 pub struct Grid {
@@ -7,23 +7,22 @@ pub struct Grid {
     bin_size: f64,
     num_bins: [usize; 3],
 }
-
 impl Grid {
-    pub fn new(box_: &Box_, bin_size: f64, cutoff_distance: f64) -> Self {
+    pub fn new(container: &Container, bin_size: f64, cutoff_distance: f64) -> Self {
         assert!(bin_size > 0.0, "Bin size must be positive");
         assert!(
-            bin_size < 0.5 * (box_.lx().min(box_.ly()).min(box_.lz())),
+            bin_size < 0.5 * (container.lx().min(container.ly()).min(container.lz())),
             "Bin size must be less than half the smallest box length"
         );
         let lo_corner = [
-            box_.xlo() - cutoff_distance,
-            box_.ylo() - cutoff_distance,
-            box_.zlo() - cutoff_distance,
+            container.xlo() - cutoff_distance,
+            container.ylo() - cutoff_distance,
+            container.zlo() - cutoff_distance,
         ];
         let hi_corner = [
-            box_.xhi() + cutoff_distance,
-            box_.yhi() + cutoff_distance,
-            box_.zhi() + cutoff_distance,
+            container.xhi() + cutoff_distance,
+            container.yhi() + cutoff_distance,
+            container.zhi() + cutoff_distance,
         ];
         let mut num_bins: [usize; 3] = [0, 0, 0];
         for i in 0..3 {

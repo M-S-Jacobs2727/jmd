@@ -50,13 +50,13 @@ impl Bounds {
     }
 }
 /// Simulation box, represented by x, y, and z Bounds
-pub struct Box_ {
+pub struct Container {
     x: Bounds,
     y: Bounds,
     z: Bounds,
 }
 
-impl Box_ {
+impl Container {
     pub fn new(
         xlo: f64,
         xhi: f64,

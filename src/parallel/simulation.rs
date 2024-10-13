@@ -1,14 +1,14 @@
 // TODO: update comm, remove args from new, add init?
 use super::{AtomInfo, Domain, NeighborDirection};
 use crate::{
-    box_::BC,
+    container::BC,
     region::{Rect, Region},
-    AtomicPotential, Atoms, Box_, NeighborList,
+    AtomicPotential, Atoms, Container, NeighborList,
 };
 
 pub struct Simulation<P: AtomicPotential> {
     pub atoms: Atoms,
-    box_: Box_,
+    container: Container,
     atomic_potential: P,
     neighbor_list: NeighborList,
     domain: Domain,
@@ -18,11 +18,11 @@ pub struct Simulation<P: AtomicPotential> {
 
 impl<P: AtomicPotential> Simulation<P> {
     pub fn new(domain: Domain) -> Self {
-        let box_ = Box_::new(0., 10., 0.0, 10.0, 0.0, 10.0, BC::PP, BC::PP, BC::PP);
-        let neighbor_list = NeighborList::new(&box_, 1.0, 1.0, 1.0);
+        let container = Container::new(0., 10., 0.0, 10.0, 0.0, 10.0, BC::PP, BC::PP, BC::PP);
+        let neighbor_list = NeighborList::new(&container, 1.0, 1.0, 1.0);
         Self {
             atoms: Atoms::new(),
-            box_,
+            container,
             atomic_potential: P::new(),
             neighbor_list,
             domain,

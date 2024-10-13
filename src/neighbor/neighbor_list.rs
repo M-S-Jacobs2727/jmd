@@ -1,6 +1,6 @@
 use super::{Grid, UpdateSettings};
 
-use crate::{utils::distance_squared, Box_};
+use crate::{utils::distance_squared, Container};
 
 /// Used for computing a list of neighboring particles
 pub struct NeighborList {
@@ -58,7 +58,7 @@ fn bin_atoms(grid: &Grid, positions: &Vec<[f64; 3]>) -> Vec<Vec<usize>> {
 }
 
 impl NeighborList {
-    pub fn new(box_: &Box_, bin_size: f64, force_distance: f64, skin_distance: f64) -> Self {
+    pub fn new(container: &Container, bin_size: f64, force_distance: f64, skin_distance: f64) -> Self {
         let neighbors: Vec<Vec<usize>> = Vec::new();
         assert!(
             force_distance > 0.0,
@@ -69,7 +69,7 @@ impl NeighborList {
             "Neighbor skin distance must be positive"
         );
         let cutoff_distance = force_distance + skin_distance;
-        let grid = Grid::new(box_, bin_size, cutoff_distance);
+        let grid = Grid::new(container, bin_size, cutoff_distance);
         let stencil = compute_stencil(grid.bin_size(), cutoff_distance);
         Self {
             grid,

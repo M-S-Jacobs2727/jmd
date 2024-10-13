@@ -4,7 +4,7 @@ use std::{
 };
 // TODO: Finish procs_in_box, integrate utils::indices
 // TODO: Extract NeighborDirection to utils::direction, add functionality
-use crate::{region::Rect, Box_, NeighborList};
+use crate::{region::Rect, Container, NeighborList};
 
 use super::worker::{Worker, M2W, W2M};
 
@@ -243,11 +243,12 @@ impl Domain {
             my_idx: [0, 0, 0],
         }
     }
-    pub fn init(&mut self, box_: &Box_, worker: &Worker) {
+    pub fn init(&mut self, container: &Container, worker: &Worker) {
         self.thread_ids.clone_from(worker.thread_ids());
 
         let num_threads = self.thread_ids.len();
-        self.proc_dimensions = procs_in_box(num_threads, box_.lx(), box_.ly(), box_.lz());
+        self.proc_dimensions =
+            procs_in_box(num_threads, container.lx(), container.ly(), container.lz());
 
         self.my_idx = linear_to_multi(
             self.thread_ids
@@ -256,19 +257,24 @@ impl Domain {
                 .unwrap(),
             &self.proc_dimensions,
         );
-        self.reset_subdomain(box_);
+        self.reset_subdomain(container);
 
-        self.setup_neighbor(worker, NeighborDirection::Xlo, box_);
-        self.setup_neighbor(worker, NeighborDirection::Xhi, box_);
-        self.setup_neighbor(worker, NeighborDirection::Ylo, box_);
-        self.setup_neighbor(worker, NeighborDirection::Yhi, box_);
-        self.setup_neighbor(worker, NeighborDirection::Zlo, box_);
-        self.setup_neighbor(worker, NeighborDirection::Zhi, box_);
+        self.setup_neighbor(worker, NeighborDirection::Xlo, container);
+        self.setup_neighbor(worker, NeighborDirection::Xhi, container);
+        self.setup_neighbor(worker, NeighborDirection::Ylo, container);
+        self.setup_neighbor(worker, NeighborDirection::Yhi, container);
+        self.setup_neighbor(worker, NeighborDirection::Zlo, container);
+        self.setup_neighbor(worker, NeighborDirection::Zhi, container);
     }
-    fn setup_neighbor(&mut self, worker: &Worker, direction: NeighborDirection, box_: &Box_) {
+    fn setup_neighbor(
+        &mut self,
+        worker: &Worker,
+        direction: NeighborDirection,
+        container: &Container,
+    ) {
         // Get index of neighbor (3d then 1d), if neighbor is present, send Option<mpsc::Sender> to main with proc idx, otherwise None and 0
         // Receive from main Option<mpsc::Sender> for opposite neighbor
-        let idx = self.get_1d_neighbor(&self.my_idx, &direction, box_);
+        let idx = self.get_1d_neighbor(&self.my_idx, &direction, container);
         let msg = match idx {
             Some(i) => (Some(self.my_sender.clone()), i),
             None => (None, 0),
@@ -285,13 +291,13 @@ impl Domain {
     pub fn initialized(&self) -> bool {
         !self.thread_ids.is_empty()
     }
-    pub fn reset_subdomain(&mut self, box_: &Box_) {
+    pub fn reset_subdomain(&mut self, container: &Container) {
         let l = [
-            box_.lx() / (self.proc_dimensions[0] as f64),
-            box_.ly() / (self.proc_dimensions[1] as f64),
-            box_.lz() / (self.proc_dimensions[2] as f64),
+            container.lx() / (self.proc_dimensions[0] as f64),
+            container.ly() / (self.proc_dimensions[1] as f64),
+            container.lz() / (self.proc_dimensions[2] as f64),
         ];
-        let lo = box_.lo();
+        let lo = container.lo();
         let sdlo = [
             lo[0] + l[0] * self.my_idx[0] as f64,
             lo[1] + l[1] * self.my_idx[1] as f64,
@@ -487,7 +493,7 @@ impl Domain {
         &self,
         my_idx: &[usize; 3],
         direction: &NeighborDirection,
-        box_: &Box_,
+        container: &Container,
     ) -> Option<[usize; 3]> {
         let (across_box, possible_neighbor) = match direction {
             NeighborDirection::Xlo => {
@@ -535,12 +541,12 @@ impl Domain {
         };
         if across_box {
             let periodic = match direction {
-                NeighborDirection::Xlo => box_.x().bc().is_periodic(),
-                NeighborDirection::Xhi => box_.x().bc().is_periodic(),
-                NeighborDirection::Ylo => box_.y().bc().is_periodic(),
-                NeighborDirection::Yhi => box_.y().bc().is_periodic(),
-                NeighborDirection::Zlo => box_.z().bc().is_periodic(),
-                NeighborDirection::Zhi => box_.z().bc().is_periodic(),
+                NeighborDirection::Xlo => container.x().bc().is_periodic(),
+                NeighborDirection::Xhi => container.x().bc().is_periodic(),
+                NeighborDirection::Ylo => container.y().bc().is_periodic(),
+                NeighborDirection::Yhi => container.y().bc().is_periodic(),
+                NeighborDirection::Zlo => container.z().bc().is_periodic(),
+                NeighborDirection::Zhi => container.z().bc().is_periodic(),
             };
             if periodic {
                 Some(possible_neighbor)
@@ -555,9 +561,9 @@ impl Domain {
         &self,
         my_idx: &[usize; 3],
         direction: &NeighborDirection,
-        box_: &Box_,
+        container: &Container,
     ) -> Option<usize> {
-        let idx3d = self.get_3d_neighbor(my_idx, direction, box_);
+        let idx3d = self.get_3d_neighbor(my_idx, direction, container);
         match idx3d {
             Some(idx) => Some(multi_to_linear(&idx, &self.proc_dimensions)),
             None => None,
