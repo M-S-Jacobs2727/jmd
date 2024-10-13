@@ -1,7 +1,6 @@
 pub mod atomic;
 // TODO: determine API
 // TODO: make sure that all private members have public getters
-// TODO: simplify box, change name?
 // TODO: implement ndarray?
 
 mod atoms;
@@ -22,3 +21,4 @@ pub use integrators::*;
 pub use jmd::Jmd;
 pub use neighbor::NeighborList;
 pub use parallel::*;
+pub use utils::{Axis, Direction};

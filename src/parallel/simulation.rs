@@ -1,8 +1,9 @@
 // TODO: update comm, remove args from new, add init?
-use super::{worker::Worker, AtomInfo, Domain, NeighborDirection};
+use super::{worker::Worker, AtomInfo, Domain};
 use crate::{
     container::BC,
     region::{Rect, Region},
+    utils::Direction,
     AtomicPotential, Atoms, Container, LJCut, NeighborList,
 };
 
@@ -92,8 +93,8 @@ impl Simulation {
         let mut sent_ids: Vec<usize> = Vec::new();
 
         // z-direction
-        self.send_reverse_comm(forces, NeighborDirection::Zhi, &mut sent_ids);
-        self.send_reverse_comm(forces, NeighborDirection::Zlo, &mut sent_ids);
+        self.send_reverse_comm(forces, Direction::Zhi, &mut sent_ids);
+        self.send_reverse_comm(forces, Direction::Zlo, &mut sent_ids);
 
         let result = self.domain.receive().expect("Disconnect error");
         if let Some(data) = result {
@@ -105,8 +106,8 @@ impl Simulation {
         }
 
         // y-direction
-        self.send_reverse_comm(forces, NeighborDirection::Yhi, &mut sent_ids);
-        self.send_reverse_comm(forces, NeighborDirection::Ylo, &mut sent_ids);
+        self.send_reverse_comm(forces, Direction::Yhi, &mut sent_ids);
+        self.send_reverse_comm(forces, Direction::Ylo, &mut sent_ids);
 
         let result = self.domain.receive().expect("Disconnect error");
         if let Some(data) = result {
@@ -118,8 +119,8 @@ impl Simulation {
         }
 
         // x-direction
-        self.send_reverse_comm(forces, NeighborDirection::Xhi, &mut sent_ids);
-        self.send_reverse_comm(forces, NeighborDirection::Xlo, &mut sent_ids);
+        self.send_reverse_comm(forces, Direction::Xhi, &mut sent_ids);
+        self.send_reverse_comm(forces, Direction::Xlo, &mut sent_ids);
 
         let result = self.domain.receive().expect("Disconnect error");
         if let Some(data) = result {
@@ -133,8 +134,8 @@ impl Simulation {
 
     pub fn forward_comm(&mut self) {
         // x-direction
-        self.send_forward_comm(NeighborDirection::Xlo);
-        self.send_forward_comm(NeighborDirection::Xhi);
+        self.send_forward_comm(Direction::Xlo);
+        self.send_forward_comm(Direction::Xhi);
 
         let result = self.domain.receive().expect("Disconnect error");
         if let Some(data) = result {
@@ -146,8 +147,8 @@ impl Simulation {
         }
 
         // y-direction
-        self.send_forward_comm(NeighborDirection::Ylo);
-        self.send_forward_comm(NeighborDirection::Yhi);
+        self.send_forward_comm(Direction::Ylo);
+        self.send_forward_comm(Direction::Yhi);
 
         let result = self.domain.receive().expect("Disconnect error");
         if let Some(data) = result {
@@ -159,8 +160,8 @@ impl Simulation {
         }
 
         // z-direction
-        self.send_forward_comm(NeighborDirection::Zlo);
-        self.send_forward_comm(NeighborDirection::Zhi);
+        self.send_forward_comm(Direction::Zlo);
+        self.send_forward_comm(Direction::Zhi);
 
         let result = self.domain.receive().expect("Disconnect error");
         if let Some(data) = result {
@@ -218,7 +219,7 @@ impl Simulation {
     fn send_reverse_comm(
         &self,
         forces: &Vec<[f64; 3]>,
-        direction: NeighborDirection,
+        direction: Direction,
         sent_ids: &mut Vec<usize>,
     ) {
         let mut atom_info = AtomInfo::new();
@@ -247,7 +248,7 @@ impl Simulation {
             .expect("Disconnect error");
     }
 
-    fn send_forward_comm(&self, direction: NeighborDirection) {
+    fn send_forward_comm(&self, direction: Direction) {
         let mut atom_info = AtomInfo::new();
         let mut ids =
             self.gather_owned_ids(self.domain.get_inner_rect(&direction, &self.neighbor_list));

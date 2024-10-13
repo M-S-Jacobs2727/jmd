@@ -1,6 +1,4 @@
-// TODO: add is_periodic function to Box, taking NeighborDirection
-
-use crate::region::Rect;
+use crate::{region::Rect, Direction};
 
 /// Boundary conditions for simulation box.
 ///
@@ -28,34 +26,11 @@ impl BC {
         }
     }
 }
-/// Upper and lower boundary with boundary conditions
-pub struct Bounds {
-    lo: f64,
-    hi: f64,
-    bc: BC,
-}
-impl Bounds {
-    pub fn new(lo: f64, hi: f64, bc: BC) -> Self {
-        if hi <= lo {
-            panic!("Lower bounds should be less than upper bounds");
-        }
-        Self { lo, hi, bc }
-    }
-    pub fn lo(&self) -> f64 {
-        self.lo
-    }
-    pub fn hi(&self) -> f64 {
-        self.hi
-    }
-    pub fn bc(&self) -> &BC {
-        &self.bc
-    }
-}
+
 /// Simulation box, represented by x, y, and z Bounds
 pub struct Container {
-    x: Bounds,
-    y: Bounds,
-    z: Bounds,
+    rect: Rect,
+    bc: [BC; 3],
 }
 
 impl Container {
@@ -66,78 +41,59 @@ impl Container {
         yhi: f64,
         zlo: f64,
         zhi: f64,
-        xpbc: BC,
-        ypbc: BC,
-        zpbc: BC,
+        xbc: BC,
+        ybc: BC,
+        zbc: BC,
     ) -> Self {
+        let rect = Rect::new(xlo, xhi, ylo, yhi, zlo, zhi);
         Self {
-            x: Bounds {
-                lo: xlo,
-                hi: xhi,
-                bc: xpbc,
-            },
-            y: Bounds {
-                lo: ylo,
-                hi: yhi,
-                bc: ypbc,
-            },
-            z: Bounds {
-                lo: zlo,
-                hi: zhi,
-                bc: zpbc,
-            },
+            rect,
+            bc: [xbc, ybc, zbc],
         }
     }
-    pub fn rect(&self) -> Rect {
-        Rect::new(
-            self.xlo(),
-            self.xhi(),
-            self.ylo(),
-            self.yhi(),
-            self.zlo(),
-            self.zhi(),
-        )
+    pub fn from_rect(rect: Rect) -> Self {
+        Self {
+            rect,
+            bc: [BC::PP, BC::PP, BC::PP],
+        }
     }
-    pub fn x(&self) -> &Bounds {
-        &self.x
+    pub fn is_periodic(&self, direction: Direction) -> bool {
+        self.bc[direction.index()].is_periodic()
     }
-    pub fn y(&self) -> &Bounds {
-        &self.y
-    }
-    pub fn z(&self) -> &Bounds {
-        &self.z
+    pub fn rect(&self) -> &Rect {
+        &self.rect
     }
     pub fn lx(&self) -> f64 {
-        self.x.lo - self.x.hi
+        self.xlo() - self.xhi()
     }
     pub fn ly(&self) -> f64 {
-        self.y.lo - self.y.hi
+        self.ylo() - self.yhi()
     }
     pub fn lz(&self) -> f64 {
-        self.z.lo - self.z.hi
+        self.zlo() - self.zhi()
     }
     pub fn lo(&self) -> [f64; 3] {
-        [self.x.lo, self.y.lo, self.z.lo]
+        [self.xlo(), self.ylo(), self.zlo()]
     }
     pub fn hi(&self) -> [f64; 3] {
-        [self.x.hi, self.y.hi, self.z.hi]
+        [self.xhi(), self.yhi(), self.zhi()]
     }
     pub fn xlo(&self) -> f64 {
-        self.x.lo
+        self.rect.xlo()
     }
     pub fn xhi(&self) -> f64 {
-        self.x.hi
+        self.rect.xhi()
     }
     pub fn ylo(&self) -> f64 {
-        self.y.lo
+        self.rect.ylo()
     }
     pub fn yhi(&self) -> f64 {
-        self.y.hi
+        self.rect.yhi()
     }
     pub fn zlo(&self) -> f64 {
-        self.z.lo
+        self.rect.zlo()
     }
     pub fn zhi(&self) -> f64 {
-        self.z.hi
+        self.rect.zhi()
     }
 }

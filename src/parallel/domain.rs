@@ -3,8 +3,7 @@ use std::{
     thread::{self, ThreadId},
 };
 // TODO: Finish procs_in_box, integrate utils::indices
-// TODO: Extract NeighborDirection to utils::direction, add functionality
-use crate::{region::Rect, Container, NeighborList};
+use crate::{region::Rect, utils::Direction, Container, NeighborList};
 
 use super::worker::{Worker, M2W, W2M};
 
@@ -45,27 +44,6 @@ fn linear_to_multi(idx: usize, lengths: &[usize; 3]) -> [usize; 3] {
     let y = r % ny;
     let x = r / ny;
     [x, y, z]
-}
-
-pub enum NeighborDirection {
-    Xlo,
-    Xhi,
-    Ylo,
-    Yhi,
-    Zlo,
-    Zhi,
-}
-impl NeighborDirection {
-    pub fn opposite(&self) -> Self {
-        match self {
-            NeighborDirection::Xlo => NeighborDirection::Xhi,
-            NeighborDirection::Xhi => NeighborDirection::Xlo,
-            NeighborDirection::Ylo => NeighborDirection::Yhi,
-            NeighborDirection::Yhi => NeighborDirection::Ylo,
-            NeighborDirection::Zlo => NeighborDirection::Zhi,
-            NeighborDirection::Zhi => NeighborDirection::Zlo,
-        }
-    }
 }
 
 // // This is given to each thread from the main thread
@@ -177,14 +155,14 @@ impl<AtomInfo> NeighborProcs<AtomInfo> {
             &self.xlo, &self.xhi, &self.ylo, &self.yhi, &self.zlo, &self.zhi,
         ]
     }
-    pub fn set(&mut self, direction: NeighborDirection, sender: mpsc::Sender<AtomInfo>) {
+    pub fn set(&mut self, direction: Direction, sender: mpsc::Sender<AtomInfo>) {
         match direction {
-            NeighborDirection::Xlo => self.xlo = Some(sender),
-            NeighborDirection::Xhi => self.xhi = Some(sender),
-            NeighborDirection::Ylo => self.ylo = Some(sender),
-            NeighborDirection::Yhi => self.yhi = Some(sender),
-            NeighborDirection::Zlo => self.zlo = Some(sender),
-            NeighborDirection::Zhi => self.zhi = Some(sender),
+            Direction::Xlo => self.xlo = Some(sender),
+            Direction::Xhi => self.xhi = Some(sender),
+            Direction::Ylo => self.ylo = Some(sender),
+            Direction::Yhi => self.yhi = Some(sender),
+            Direction::Zlo => self.zlo = Some(sender),
+            Direction::Zhi => self.zhi = Some(sender),
         };
     }
 }
@@ -259,19 +237,14 @@ impl Domain {
         );
         self.reset_subdomain(container);
 
-        self.setup_neighbor(worker, NeighborDirection::Xlo, container);
-        self.setup_neighbor(worker, NeighborDirection::Xhi, container);
-        self.setup_neighbor(worker, NeighborDirection::Ylo, container);
-        self.setup_neighbor(worker, NeighborDirection::Yhi, container);
-        self.setup_neighbor(worker, NeighborDirection::Zlo, container);
-        self.setup_neighbor(worker, NeighborDirection::Zhi, container);
+        self.setup_neighbor(worker, Direction::Xlo, container);
+        self.setup_neighbor(worker, Direction::Xhi, container);
+        self.setup_neighbor(worker, Direction::Ylo, container);
+        self.setup_neighbor(worker, Direction::Yhi, container);
+        self.setup_neighbor(worker, Direction::Zlo, container);
+        self.setup_neighbor(worker, Direction::Zhi, container);
     }
-    fn setup_neighbor(
-        &mut self,
-        worker: &Worker,
-        direction: NeighborDirection,
-        container: &Container,
-    ) {
+    fn setup_neighbor(&mut self, worker: &Worker, direction: Direction, container: &Container) {
         // Get index of neighbor (3d then 1d), if neighbor is present, send Option<mpsc::Sender> to main with proc idx, otherwise None and 0
         // Receive from main Option<mpsc::Sender> for opposite neighbor
         let idx = self.get_1d_neighbor(&self.my_idx, &direction, container);
@@ -313,16 +286,12 @@ impl Domain {
         );
     }
 
-    pub fn get_inner_rect(
-        &self,
-        direction: &NeighborDirection,
-        neighbor_list: &NeighborList,
-    ) -> Rect {
+    pub fn get_inner_rect(&self, direction: &Direction, neighbor_list: &NeighborList) -> Rect {
         let dist = neighbor_list.neighbor_distance();
         let half_skin = neighbor_list.skin_distance() * 0.5;
 
         match direction {
-            NeighborDirection::Xlo => Rect::new(
+            Direction::Xlo => Rect::new(
                 self.subdomain.xlo() - half_skin,
                 self.subdomain.xlo() + dist,
                 self.subdomain.ylo() - half_skin,
@@ -330,7 +299,7 @@ impl Domain {
                 self.subdomain.zlo() - half_skin,
                 self.subdomain.zhi() + half_skin,
             ),
-            NeighborDirection::Xhi => Rect::new(
+            Direction::Xhi => Rect::new(
                 self.subdomain.xhi() - dist,
                 self.subdomain.xhi() + half_skin,
                 self.subdomain.ylo() - half_skin,
@@ -338,7 +307,7 @@ impl Domain {
                 self.subdomain.zlo() - half_skin,
                 self.subdomain.zhi() + half_skin,
             ),
-            NeighborDirection::Ylo => Rect::new(
+            Direction::Ylo => Rect::new(
                 self.subdomain.xlo() - dist,
                 self.subdomain.xhi() + dist,
                 self.subdomain.ylo() - half_skin,
@@ -346,7 +315,7 @@ impl Domain {
                 self.subdomain.zlo() - half_skin,
                 self.subdomain.zhi() + half_skin,
             ),
-            NeighborDirection::Yhi => Rect::new(
+            Direction::Yhi => Rect::new(
                 self.subdomain.xlo() - dist,
                 self.subdomain.xhi() + dist,
                 self.subdomain.yhi() - dist,
@@ -354,7 +323,7 @@ impl Domain {
                 self.subdomain.zlo() - half_skin,
                 self.subdomain.zhi() + half_skin,
             ),
-            NeighborDirection::Zlo => Rect::new(
+            Direction::Zlo => Rect::new(
                 self.subdomain.xlo() - dist,
                 self.subdomain.xhi() + dist,
                 self.subdomain.ylo() - dist,
@@ -362,7 +331,7 @@ impl Domain {
                 self.subdomain.zlo() - half_skin,
                 self.subdomain.zlo() + dist,
             ),
-            NeighborDirection::Zhi => Rect::new(
+            Direction::Zhi => Rect::new(
                 self.subdomain.xlo() - dist,
                 self.subdomain.xhi() + dist,
                 self.subdomain.ylo() - dist,
@@ -373,16 +342,12 @@ impl Domain {
         }
     }
 
-    pub fn get_outer_rect(
-        &self,
-        direction: &NeighborDirection,
-        neighbor_list: &NeighborList,
-    ) -> Rect {
+    pub fn get_outer_rect(&self, direction: &Direction, neighbor_list: &NeighborList) -> Rect {
         let dist = neighbor_list.neighbor_distance();
         let half_skin = neighbor_list.skin_distance() * 0.5;
 
         match direction {
-            NeighborDirection::Xlo => Rect::new(
+            Direction::Xlo => Rect::new(
                 self.subdomain.xlo() - dist,
                 self.subdomain.xlo() + half_skin,
                 self.subdomain.ylo() - half_skin,
@@ -390,7 +355,7 @@ impl Domain {
                 self.subdomain.zlo() - half_skin,
                 self.subdomain.zhi() + half_skin,
             ),
-            NeighborDirection::Xhi => Rect::new(
+            Direction::Xhi => Rect::new(
                 self.subdomain.xhi() - half_skin,
                 self.subdomain.xhi() + dist,
                 self.subdomain.ylo() - half_skin,
@@ -398,7 +363,7 @@ impl Domain {
                 self.subdomain.zlo() - half_skin,
                 self.subdomain.zhi() + half_skin,
             ),
-            NeighborDirection::Ylo => Rect::new(
+            Direction::Ylo => Rect::new(
                 self.subdomain.xlo() - dist,
                 self.subdomain.xhi() + dist,
                 self.subdomain.ylo() - dist,
@@ -406,7 +371,7 @@ impl Domain {
                 self.subdomain.zlo() - half_skin,
                 self.subdomain.zhi() + half_skin,
             ),
-            NeighborDirection::Yhi => Rect::new(
+            Direction::Yhi => Rect::new(
                 self.subdomain.xlo() - dist,
                 self.subdomain.xhi() + dist,
                 self.subdomain.yhi() - half_skin,
@@ -414,7 +379,7 @@ impl Domain {
                 self.subdomain.zlo() - half_skin,
                 self.subdomain.zhi() + half_skin,
             ),
-            NeighborDirection::Zlo => Rect::new(
+            Direction::Zlo => Rect::new(
                 self.subdomain.xlo() - dist,
                 self.subdomain.xhi() + dist,
                 self.subdomain.ylo() - dist,
@@ -422,7 +387,7 @@ impl Domain {
                 self.subdomain.zlo() - dist,
                 self.subdomain.zlo() + half_skin,
             ),
-            NeighborDirection::Zhi => Rect::new(
+            Direction::Zhi => Rect::new(
                 self.subdomain.xlo() - dist,
                 self.subdomain.xhi() + dist,
                 self.subdomain.ylo() - dist,
@@ -442,11 +407,7 @@ impl Domain {
     pub fn neighbor_procs(&self) -> &NeighborProcs<AtomInfo> {
         &self.neighbor_procs
     }
-    pub fn set_neighbor_proc(
-        &mut self,
-        direction: NeighborDirection,
-        sender: mpsc::Sender<AtomInfo>,
-    ) {
+    pub fn set_neighbor_proc(&mut self, direction: Direction, sender: mpsc::Sender<AtomInfo>) {
         self.neighbor_procs.set(direction, sender);
     }
     pub fn set_thread_ids(&mut self, thread_ids: Vec<ThreadId>) {
@@ -474,15 +435,15 @@ impl Domain {
     pub fn send(
         &self,
         value: AtomInfo,
-        neighbor: NeighborDirection,
+        neighbor: Direction,
     ) -> Result<(), mpsc::SendError<AtomInfo>> {
         let n = match neighbor {
-            NeighborDirection::Xlo => self.neighbor_procs.xlo.as_ref(),
-            NeighborDirection::Xhi => self.neighbor_procs.xhi.as_ref(),
-            NeighborDirection::Ylo => self.neighbor_procs.ylo.as_ref(),
-            NeighborDirection::Yhi => self.neighbor_procs.yhi.as_ref(),
-            NeighborDirection::Zlo => self.neighbor_procs.zlo.as_ref(),
-            NeighborDirection::Zhi => self.neighbor_procs.zhi.as_ref(),
+            Direction::Xlo => self.neighbor_procs.xlo.as_ref(),
+            Direction::Xhi => self.neighbor_procs.xhi.as_ref(),
+            Direction::Ylo => self.neighbor_procs.ylo.as_ref(),
+            Direction::Yhi => self.neighbor_procs.yhi.as_ref(),
+            Direction::Zlo => self.neighbor_procs.zlo.as_ref(),
+            Direction::Zhi => self.neighbor_procs.zhi.as_ref(),
         };
         match n {
             Some(s) => s.send(value),
@@ -492,46 +453,46 @@ impl Domain {
     fn get_3d_neighbor(
         &self,
         my_idx: &[usize; 3],
-        direction: &NeighborDirection,
+        direction: &Direction,
         container: &Container,
     ) -> Option<[usize; 3]> {
         let (across_box, possible_neighbor) = match direction {
-            NeighborDirection::Xlo => {
+            Direction::Xlo => {
                 if my_idx[0] == 0 {
                     (true, [self.proc_dimensions[0] - 1, my_idx[1], my_idx[2]])
                 } else {
                     (false, [my_idx[0] - 1, my_idx[1], my_idx[2]])
                 }
             }
-            NeighborDirection::Xhi => {
+            Direction::Xhi => {
                 if my_idx[0] == self.proc_dimensions[0] - 1 {
                     (true, [0, my_idx[1], my_idx[2]])
                 } else {
                     (false, [my_idx[0] + 1, my_idx[1], my_idx[2]])
                 }
             }
-            NeighborDirection::Ylo => {
+            Direction::Ylo => {
                 if my_idx[1] == 0 {
                     (true, [my_idx[0], self.proc_dimensions[1] - 1, my_idx[2]])
                 } else {
                     (false, [my_idx[0], my_idx[1] - 1, my_idx[2]])
                 }
             }
-            NeighborDirection::Yhi => {
+            Direction::Yhi => {
                 if my_idx[1] == self.proc_dimensions[1] - 1 {
                     (true, [my_idx[0], 0, my_idx[2]])
                 } else {
                     (false, [my_idx[0], my_idx[1] + 1, my_idx[2]])
                 }
             }
-            NeighborDirection::Zlo => {
+            Direction::Zlo => {
                 if my_idx[2] == 0 {
                     (true, [my_idx[0], my_idx[1], self.proc_dimensions[2] - 1])
                 } else {
                     (false, [my_idx[0], my_idx[1], my_idx[2] - 1])
                 }
             }
-            NeighborDirection::Zhi => {
+            Direction::Zhi => {
                 if my_idx[2] == self.proc_dimensions[2] - 1 {
                     (true, [my_idx[0], my_idx[1], 0])
                 } else {
@@ -541,12 +502,12 @@ impl Domain {
         };
         if across_box {
             let periodic = match direction {
-                NeighborDirection::Xlo => container.x().bc().is_periodic(),
-                NeighborDirection::Xhi => container.x().bc().is_periodic(),
-                NeighborDirection::Ylo => container.y().bc().is_periodic(),
-                NeighborDirection::Yhi => container.y().bc().is_periodic(),
-                NeighborDirection::Zlo => container.z().bc().is_periodic(),
-                NeighborDirection::Zhi => container.z().bc().is_periodic(),
+                Direction::Xlo => container.x().bc().is_periodic(),
+                Direction::Xhi => container.x().bc().is_periodic(),
+                Direction::Ylo => container.y().bc().is_periodic(),
+                Direction::Yhi => container.y().bc().is_periodic(),
+                Direction::Zlo => container.z().bc().is_periodic(),
+                Direction::Zhi => container.z().bc().is_periodic(),
             };
             if periodic {
                 Some(possible_neighbor)
@@ -560,7 +521,7 @@ impl Domain {
     fn get_1d_neighbor(
         &self,
         my_idx: &[usize; 3],
-        direction: &NeighborDirection,
+        direction: &Direction,
         container: &Container,
     ) -> Option<usize> {
         let idx3d = self.get_3d_neighbor(my_idx, direction, container);
