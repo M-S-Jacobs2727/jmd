@@ -1,4 +1,3 @@
-use std::rc::Rc;
 // TODO: update comm, remove args from new, add init?
 use super::{AtomInfo, Domain, NeighborDirection};
 use crate::{
@@ -10,26 +9,23 @@ use crate::{
 pub struct Simulation<P: AtomicPotential> {
     pub atoms: Atoms,
     box_: Box_,
-    domain: Rect,
     atomic_potential: P,
     neighbor_list: NeighborList,
-    comm: Rc<Domain<AtomInfo>>,
+    domain: Domain,
     nlocal: usize,
     max_distance_sq: f64,
 }
 
 impl<P: AtomicPotential> Simulation<P> {
-    pub fn new(comm: Rc<Domain<AtomInfo>>) -> Self {
+    pub fn new(domain: Domain) -> Self {
         let box_ = Box_::new(0., 10., 0.0, 10.0, 0.0, 10.0, BC::PP, BC::PP, BC::PP);
-        let domain = box_.subdomain(comm.distribution_info());
         let neighbor_list = NeighborList::new(&box_, 1.0, 1.0, 1.0);
         Self {
             atoms: Atoms::new(),
             box_,
-            domain,
             atomic_potential: P::new(),
             neighbor_list,
-            comm,
+            domain,
             nlocal: 0,
             max_distance_sq: 0.0,
         }
@@ -64,11 +60,11 @@ impl<P: AtomicPotential> Simulation<P> {
         self.send_reverse_comm(forces, NeighborDirection::Zhi, &mut sent_ids);
         self.send_reverse_comm(forces, NeighborDirection::Zlo, &mut sent_ids);
 
-        let result = self.comm.receive().expect("Disconnect error");
+        let result = self.domain.receive().expect("Disconnect error");
         if let Some(data) = result {
             self.accumulate_forces(data, forces);
         }
-        let result = self.comm.receive().expect("Disconnect error");
+        let result = self.domain.receive().expect("Disconnect error");
         if let Some(data) = result {
             self.accumulate_forces(data, forces);
         }
@@ -77,11 +73,11 @@ impl<P: AtomicPotential> Simulation<P> {
         self.send_reverse_comm(forces, NeighborDirection::Yhi, &mut sent_ids);
         self.send_reverse_comm(forces, NeighborDirection::Ylo, &mut sent_ids);
 
-        let result = self.comm.receive().expect("Disconnect error");
+        let result = self.domain.receive().expect("Disconnect error");
         if let Some(data) = result {
             self.accumulate_forces(data, forces);
         }
-        let result = self.comm.receive().expect("Disconnect error");
+        let result = self.domain.receive().expect("Disconnect error");
         if let Some(data) = result {
             self.accumulate_forces(data, forces);
         }
@@ -90,11 +86,11 @@ impl<P: AtomicPotential> Simulation<P> {
         self.send_reverse_comm(forces, NeighborDirection::Xhi, &mut sent_ids);
         self.send_reverse_comm(forces, NeighborDirection::Xlo, &mut sent_ids);
 
-        let result = self.comm.receive().expect("Disconnect error");
+        let result = self.domain.receive().expect("Disconnect error");
         if let Some(data) = result {
             self.accumulate_forces(data, forces);
         }
-        let result = self.comm.receive().expect("Disconnect error");
+        let result = self.domain.receive().expect("Disconnect error");
         if let Some(data) = result {
             self.accumulate_forces(data, forces);
         }
@@ -105,11 +101,11 @@ impl<P: AtomicPotential> Simulation<P> {
         self.send_forward_comm(NeighborDirection::Xlo);
         self.send_forward_comm(NeighborDirection::Xhi);
 
-        let result = self.comm.receive().expect("Disconnect error");
+        let result = self.domain.receive().expect("Disconnect error");
         if let Some(data) = result {
             self.update_ghost_atoms(data);
         }
-        let result = self.comm.receive().expect("Disconnect error");
+        let result = self.domain.receive().expect("Disconnect error");
         if let Some(data) = result {
             self.update_ghost_atoms(data);
         }
@@ -118,11 +114,11 @@ impl<P: AtomicPotential> Simulation<P> {
         self.send_forward_comm(NeighborDirection::Ylo);
         self.send_forward_comm(NeighborDirection::Yhi);
 
-        let result = self.comm.receive().expect("Disconnect error");
+        let result = self.domain.receive().expect("Disconnect error");
         if let Some(data) = result {
             self.update_ghost_atoms(data);
         }
-        let result = self.comm.receive().expect("Disconnect error");
+        let result = self.domain.receive().expect("Disconnect error");
         if let Some(data) = result {
             self.update_ghost_atoms(data);
         }
@@ -131,11 +127,11 @@ impl<P: AtomicPotential> Simulation<P> {
         self.send_forward_comm(NeighborDirection::Zlo);
         self.send_forward_comm(NeighborDirection::Zhi);
 
-        let result = self.comm.receive().expect("Disconnect error");
+        let result = self.domain.receive().expect("Disconnect error");
         if let Some(data) = result {
             self.update_ghost_atoms(data);
         }
-        let result = self.comm.receive().expect("Disconnect error");
+        let result = self.domain.receive().expect("Disconnect error");
         if let Some(data) = result {
             self.update_ghost_atoms(data);
         }
@@ -184,118 +180,6 @@ impl<P: AtomicPotential> Simulation<P> {
         }
     }
 
-    fn get_inner_rect(&self, direction: &NeighborDirection) -> Rect {
-        let dist = self.neighbor_list.neighbor_distance();
-        let half_skin = self.neighbor_list.skin_distance() * 0.5;
-
-        match direction {
-            NeighborDirection::Xlo => Rect::new(
-                self.domain.xlo() - half_skin,
-                self.domain.xlo() + dist,
-                self.domain.ylo() - half_skin,
-                self.domain.yhi() + half_skin,
-                self.domain.zlo() - half_skin,
-                self.domain.zhi() + half_skin,
-            ),
-            NeighborDirection::Xhi => Rect::new(
-                self.domain.xhi() - dist,
-                self.domain.xhi() + half_skin,
-                self.domain.ylo() - half_skin,
-                self.domain.yhi() + half_skin,
-                self.domain.zlo() - half_skin,
-                self.domain.zhi() + half_skin,
-            ),
-            NeighborDirection::Ylo => Rect::new(
-                self.domain.xlo() - dist,
-                self.domain.xhi() + dist,
-                self.domain.ylo() - half_skin,
-                self.domain.ylo() + dist,
-                self.domain.zlo() - half_skin,
-                self.domain.zhi() + half_skin,
-            ),
-            NeighborDirection::Yhi => Rect::new(
-                self.domain.xlo() - dist,
-                self.domain.xhi() + dist,
-                self.domain.yhi() - dist,
-                self.domain.yhi() + half_skin,
-                self.domain.zlo() - half_skin,
-                self.domain.zhi() + half_skin,
-            ),
-            NeighborDirection::Zlo => Rect::new(
-                self.domain.xlo() - dist,
-                self.domain.xhi() + dist,
-                self.domain.ylo() - dist,
-                self.domain.yhi() + dist,
-                self.domain.zlo() - half_skin,
-                self.domain.zlo() + dist,
-            ),
-            NeighborDirection::Zhi => Rect::new(
-                self.domain.xlo() - dist,
-                self.domain.xhi() + dist,
-                self.domain.ylo() - dist,
-                self.domain.yhi() + dist,
-                self.domain.zhi() - dist,
-                self.domain.zhi() + half_skin,
-            ),
-        }
-    }
-
-    fn get_outer_rect(&self, direction: &NeighborDirection) -> Rect {
-        let dist = self.neighbor_list.neighbor_distance();
-        let half_skin = self.neighbor_list.skin_distance() * 0.5;
-
-        match direction {
-            NeighborDirection::Xlo => Rect::new(
-                self.domain.xlo() - dist,
-                self.domain.xlo() + half_skin,
-                self.domain.ylo() - half_skin,
-                self.domain.yhi() + half_skin,
-                self.domain.zlo() - half_skin,
-                self.domain.zhi() + half_skin,
-            ),
-            NeighborDirection::Xhi => Rect::new(
-                self.domain.xhi() - half_skin,
-                self.domain.xhi() + dist,
-                self.domain.ylo() - half_skin,
-                self.domain.yhi() + half_skin,
-                self.domain.zlo() - half_skin,
-                self.domain.zhi() + half_skin,
-            ),
-            NeighborDirection::Ylo => Rect::new(
-                self.domain.xlo() - dist,
-                self.domain.xhi() + dist,
-                self.domain.ylo() - dist,
-                self.domain.ylo() + half_skin,
-                self.domain.zlo() - half_skin,
-                self.domain.zhi() + half_skin,
-            ),
-            NeighborDirection::Yhi => Rect::new(
-                self.domain.xlo() - dist,
-                self.domain.xhi() + dist,
-                self.domain.yhi() - half_skin,
-                self.domain.yhi() + dist,
-                self.domain.zlo() - half_skin,
-                self.domain.zhi() + half_skin,
-            ),
-            NeighborDirection::Zlo => Rect::new(
-                self.domain.xlo() - dist,
-                self.domain.xhi() + dist,
-                self.domain.ylo() - dist,
-                self.domain.yhi() + dist,
-                self.domain.zlo() - dist,
-                self.domain.zlo() + half_skin,
-            ),
-            NeighborDirection::Zhi => Rect::new(
-                self.domain.xlo() - dist,
-                self.domain.xhi() + dist,
-                self.domain.ylo() - dist,
-                self.domain.yhi() + dist,
-                self.domain.zhi() - half_skin,
-                self.domain.zhi() + dist,
-            ),
-        }
-    }
-
     fn send_reverse_comm(
         &self,
         forces: &Vec<[f64; 3]>,
@@ -303,7 +187,8 @@ impl<P: AtomicPotential> Simulation<P> {
         sent_ids: &mut Vec<usize>,
     ) {
         let mut atom_info = AtomInfo::new();
-        let mut ids = self.gather_ghost_ids(self.get_outer_rect(&direction));
+        let mut ids =
+            self.gather_ghost_ids(self.domain.get_outer_rect(&direction, &self.neighbor_list));
 
         atom_info.ids.append(&mut ids);
         atom_info.data.reserve(atom_info.ids.len() * 3);
@@ -322,14 +207,15 @@ impl<P: AtomicPotential> Simulation<P> {
         }
         sent_ids.append(&mut atom_info.ids.clone());
 
-        self.comm
+        self.domain
             .send(atom_info, direction)
             .expect("Disconnect error");
     }
 
     fn send_forward_comm(&self, direction: NeighborDirection) {
         let mut atom_info = AtomInfo::new();
-        let mut ids = self.gather_owned_ids(self.get_inner_rect(&direction));
+        let mut ids =
+            self.gather_owned_ids(self.domain.get_inner_rect(&direction, &self.neighbor_list));
 
         atom_info.ids.append(&mut ids);
         atom_info.data.reserve(atom_info.ids.len() * 7);
@@ -364,7 +250,7 @@ impl<P: AtomicPotential> Simulation<P> {
             atom_info.data.push(self.atoms.velocities[i][2]);
         }
 
-        self.comm
+        self.domain
             .send(atom_info, direction)
             .expect("Disconnect error");
     }

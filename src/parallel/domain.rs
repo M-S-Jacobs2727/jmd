@@ -4,7 +4,7 @@ use std::{
 };
 // TODO: Finish procs_in_box, integrate utils::indices
 // TODO: Extract NeighborDirection to utils::direction, add functionality
-use crate::{region::Rect, Box_, ThreadIds};
+use crate::{region::Rect, Box_, NeighborList};
 
 use super::worker::{Worker, M2W, W2M};
 
@@ -223,7 +223,7 @@ pub struct Domain {
     receiver: mpsc::Receiver<AtomInfo>,
     my_sender: mpsc::Sender<AtomInfo>,
     neighbor_procs: NeighborProcs<AtomInfo>,
-    thread_ids: ThreadIds,
+    thread_ids: Vec<ThreadId>,
     subdomain: Rect,
     proc_dimensions: [usize; 3],
     my_idx: [usize; 3],
@@ -306,6 +306,127 @@ impl Domain {
             sdlo[2] + l[2],
         );
     }
+
+    pub fn get_inner_rect(
+        &self,
+        direction: &NeighborDirection,
+        neighbor_list: &NeighborList,
+    ) -> Rect {
+        let dist = neighbor_list.neighbor_distance();
+        let half_skin = neighbor_list.skin_distance() * 0.5;
+
+        match direction {
+            NeighborDirection::Xlo => Rect::new(
+                self.subdomain.xlo() - half_skin,
+                self.subdomain.xlo() + dist,
+                self.subdomain.ylo() - half_skin,
+                self.subdomain.yhi() + half_skin,
+                self.subdomain.zlo() - half_skin,
+                self.subdomain.zhi() + half_skin,
+            ),
+            NeighborDirection::Xhi => Rect::new(
+                self.subdomain.xhi() - dist,
+                self.subdomain.xhi() + half_skin,
+                self.subdomain.ylo() - half_skin,
+                self.subdomain.yhi() + half_skin,
+                self.subdomain.zlo() - half_skin,
+                self.subdomain.zhi() + half_skin,
+            ),
+            NeighborDirection::Ylo => Rect::new(
+                self.subdomain.xlo() - dist,
+                self.subdomain.xhi() + dist,
+                self.subdomain.ylo() - half_skin,
+                self.subdomain.ylo() + dist,
+                self.subdomain.zlo() - half_skin,
+                self.subdomain.zhi() + half_skin,
+            ),
+            NeighborDirection::Yhi => Rect::new(
+                self.subdomain.xlo() - dist,
+                self.subdomain.xhi() + dist,
+                self.subdomain.yhi() - dist,
+                self.subdomain.yhi() + half_skin,
+                self.subdomain.zlo() - half_skin,
+                self.subdomain.zhi() + half_skin,
+            ),
+            NeighborDirection::Zlo => Rect::new(
+                self.subdomain.xlo() - dist,
+                self.subdomain.xhi() + dist,
+                self.subdomain.ylo() - dist,
+                self.subdomain.yhi() + dist,
+                self.subdomain.zlo() - half_skin,
+                self.subdomain.zlo() + dist,
+            ),
+            NeighborDirection::Zhi => Rect::new(
+                self.subdomain.xlo() - dist,
+                self.subdomain.xhi() + dist,
+                self.subdomain.ylo() - dist,
+                self.subdomain.yhi() + dist,
+                self.subdomain.zhi() - dist,
+                self.subdomain.zhi() + half_skin,
+            ),
+        }
+    }
+
+    pub fn get_outer_rect(
+        &self,
+        direction: &NeighborDirection,
+        neighbor_list: &NeighborList,
+    ) -> Rect {
+        let dist = neighbor_list.neighbor_distance();
+        let half_skin = neighbor_list.skin_distance() * 0.5;
+
+        match direction {
+            NeighborDirection::Xlo => Rect::new(
+                self.subdomain.xlo() - dist,
+                self.subdomain.xlo() + half_skin,
+                self.subdomain.ylo() - half_skin,
+                self.subdomain.yhi() + half_skin,
+                self.subdomain.zlo() - half_skin,
+                self.subdomain.zhi() + half_skin,
+            ),
+            NeighborDirection::Xhi => Rect::new(
+                self.subdomain.xhi() - half_skin,
+                self.subdomain.xhi() + dist,
+                self.subdomain.ylo() - half_skin,
+                self.subdomain.yhi() + half_skin,
+                self.subdomain.zlo() - half_skin,
+                self.subdomain.zhi() + half_skin,
+            ),
+            NeighborDirection::Ylo => Rect::new(
+                self.subdomain.xlo() - dist,
+                self.subdomain.xhi() + dist,
+                self.subdomain.ylo() - dist,
+                self.subdomain.ylo() + half_skin,
+                self.subdomain.zlo() - half_skin,
+                self.subdomain.zhi() + half_skin,
+            ),
+            NeighborDirection::Yhi => Rect::new(
+                self.subdomain.xlo() - dist,
+                self.subdomain.xhi() + dist,
+                self.subdomain.yhi() - half_skin,
+                self.subdomain.yhi() + dist,
+                self.subdomain.zlo() - half_skin,
+                self.subdomain.zhi() + half_skin,
+            ),
+            NeighborDirection::Zlo => Rect::new(
+                self.subdomain.xlo() - dist,
+                self.subdomain.xhi() + dist,
+                self.subdomain.ylo() - dist,
+                self.subdomain.yhi() + dist,
+                self.subdomain.zlo() - dist,
+                self.subdomain.zlo() + half_skin,
+            ),
+            NeighborDirection::Zhi => Rect::new(
+                self.subdomain.xlo() - dist,
+                self.subdomain.xhi() + dist,
+                self.subdomain.ylo() - dist,
+                self.subdomain.yhi() + dist,
+                self.subdomain.zhi() - half_skin,
+                self.subdomain.zhi() + dist,
+            ),
+        }
+    }
+
     pub fn clone_sender(&self) -> mpsc::Sender<AtomInfo> {
         self.my_sender.clone()
     }
@@ -325,7 +446,7 @@ impl Domain {
     pub fn set_thread_ids(&mut self, thread_ids: Vec<ThreadId>) {
         self.thread_ids = thread_ids;
     }
-    pub fn thread_ids(&self) -> &ThreadIds {
+    pub fn thread_ids(&self) -> &Vec<ThreadId> {
         &self.thread_ids
     }
     pub fn num_neighbors(&self) -> usize {
