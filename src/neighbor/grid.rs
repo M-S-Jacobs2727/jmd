@@ -3,7 +3,6 @@ use crate::Container;
 /// Neighbor list grid of bins
 pub struct Grid {
     lo_corner: [f64; 3],
-    hi_corner: [f64; 3],
     bin_size: f64,
     num_bins: [usize; 3],
 }
@@ -31,7 +30,6 @@ impl Grid {
         }
         Self {
             lo_corner,
-            hi_corner,
             bin_size,
             num_bins,
         }
@@ -41,6 +39,16 @@ impl Grid {
     }
     pub fn total_num_bins(&self) -> usize {
         self.num_bins[0] * self.num_bins[1] * self.num_bins[2]
+    }
+    pub fn lo_corner(&self) -> [f64; 3] {
+        self.lo_corner.clone()
+    }
+    pub fn hi_corner(&self) -> [f64; 3] {
+        [
+            self.lo_corner[0] + self.bin_size * self.num_bins[0] as f64,
+            self.lo_corner[1] + self.bin_size * self.num_bins[1] as f64,
+            self.lo_corner[2] + self.bin_size * self.num_bins[2] as f64,
+        ]
     }
     pub fn num_bins(&self) -> &[usize; 3] {
         &self.num_bins
