@@ -2,10 +2,12 @@ use super::AtomicPotential;
 use crate::Atoms;
 
 pub struct None_ {}
-impl AtomicPotential for None_ {
-    fn new() -> Self {
+impl None_ {
+    pub fn new() -> Self {
         Self {}
     }
+}
+impl AtomicPotential for None_ {
     fn cutoff_distance(&self) -> f64 {
         0.0
     }

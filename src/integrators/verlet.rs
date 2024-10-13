@@ -6,7 +6,7 @@ pub struct Verlet {
     pub timestep: f64,
 }
 
-impl<'a> Verlet {
+impl Verlet {
     /// Steps the velocities of the simulation by half a timestep
     fn increment_velocity_halfstep(&self, simulation: &mut Simulation, forces: &Vec<[f64; 3]>) {
         for i in 0..simulation.atoms.num_atoms() {

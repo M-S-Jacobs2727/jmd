@@ -2,24 +2,20 @@ pub mod ljcut;
 pub mod none;
 
 pub use ljcut::{LJCut, LJCutCoeff};
-pub enum AP {
-    LJ(LJCut),
-    N(none::None_),
-}
-impl AP {
-    pub fn compute_forces(&self, atoms: &Atoms) -> Vec<[f64; 3]> {
-        match self {
-            AP::LJ(lj) => lj.compute_forces(atoms),
-            AP::N(n) => n.compute_forces(atoms),
-        }
-    }
-}
+
 use crate::Atoms;
+use enum_dispatch::enum_dispatch;
+use none::None_;
+
+#[enum_dispatch]
+pub enum AP {
+    LJCut,
+    None_,
+}
 // TODO: add num_types to new method
+#[enum_dispatch(AP)]
 /// Trait for pairwise atomic potentials
 pub trait AtomicPotential {
-    fn new() -> Self;
-
     /// Get the maximum distance for effective interaction
     fn cutoff_distance(&self) -> f64;
 

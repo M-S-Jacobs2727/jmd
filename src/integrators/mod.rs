@@ -1,6 +1,6 @@
 use crate::parallel::Simulation;
 
-pub mod verlet;
+mod verlet;
 pub use verlet::Verlet;
 
 /// Simulation integrator

@@ -23,7 +23,7 @@ impl Simulation {
         Self {
             atoms: Atoms::new(),
             container,
-            atomic_potential: crate::AP::LJ(LJCut::new()),
+            atomic_potential: LJCut::new().into(),
             neighbor_list,
             domain: Domain::new(),
             nlocal: 0,

@@ -39,6 +39,13 @@ pub struct LJCut {
     type_pairs: Vec<[u32; 2]>,
 }
 impl LJCut {
+    pub fn new() -> Self {
+        Self {
+            num_types: 0,
+            coeffs: Vec::new(),
+            type_pairs: Vec::new(),
+        }
+    }
     pub fn add_coeff(
         &mut self,
         type_i: u32,
@@ -64,13 +71,6 @@ impl LJCut {
 }
 
 impl AtomicPotential for LJCut {
-    fn new() -> Self {
-        Self {
-            num_types: 0,
-            coeffs: Vec::new(),
-            type_pairs: Vec::new(),
-        }
-    }
     fn cutoff_distance(&self) -> f64 {
         self.coeffs
             .iter()
