@@ -2,23 +2,20 @@ use super::Integrator;
 use crate::{AtomicPotential, Simulation};
 
 /// Velocity-verlet integrator
-pub struct Verlet<P: AtomicPotential> {
-    timestep: f64,
-    simulation: Simulation<P>,
+pub struct Verlet {
+    pub timestep: f64,
 }
 
-impl<'a, P: AtomicPotential> Verlet<P> {
-    pub fn new(timestep: f64, simulation: Simulation<P>) -> Self {
-        Self {
-            timestep,
-            simulation,
-        }
-    }
+impl<'a> Verlet {
     /// Steps the velocities of the simulation by half a timestep
-    fn increment_velocity_halfstep(&mut self, forces: &Vec<[f64; 3]>) {
-        for i in 0..self.simulation.atoms.num_atoms() {
-            let mass = self.simulation.atoms.masses()[i];
-            self.simulation.atoms.increment_velocity(
+    fn increment_velocity_halfstep<P: AtomicPotential>(
+        &self,
+        simulation: &mut Simulation<P>,
+        forces: &Vec<[f64; 3]>,
+    ) {
+        for i in 0..simulation.atoms.num_atoms() {
+            let mass = simulation.atoms.masses()[i];
+            simulation.atoms.increment_velocity(
                 i,
                 [
                     0.5 * self.timestep * forces[i][0] / mass,
@@ -29,14 +26,14 @@ impl<'a, P: AtomicPotential> Verlet<P> {
         }
     }
     /// Steps the positions of the simulation forward
-    fn increment_positions(&mut self) {
-        for i in 0..self.simulation.atoms.num_atoms() {
-            let vel = self.simulation.atoms.velocities()[i];
-            self.simulation.update_max_distance_sq(
+    fn increment_positions<P: AtomicPotential>(&self, simulation: &mut Simulation<P>) {
+        for i in 0..simulation.atoms.num_atoms() {
+            let vel = simulation.atoms.velocities()[i];
+            simulation.update_max_distance_sq(
                 self.timestep * (vel[0] * vel[0] + vel[1] * vel[1] + vel[2] * vel[2]),
             );
 
-            self.simulation.atoms.increment_position(
+            simulation.atoms.increment_position(
                 i,
                 [
                     self.timestep * vel[0],
@@ -48,30 +45,27 @@ impl<'a, P: AtomicPotential> Verlet<P> {
     }
 }
 
-impl<P: AtomicPotential> Integrator<P> for Verlet<P> {
-    fn new(simulation: Simulation<P>) -> Self {
-        Self {
-            timestep: 0.005,
-            simulation,
-        }
+impl Integrator for Verlet {
+    fn new() -> Self {
+        Self { timestep: 0.005 }
     }
-    fn run(&mut self, num_steps: usize) {
-        self.simulation.forward_comm();
-        self.simulation.build_neighbor_list();
-        let mut forces = self.simulation.compute_forces();
-        self.simulation.reverse_comm(&mut forces);
+    fn run<P: AtomicPotential>(&self, simulation: &mut Simulation<P>, num_steps: usize) {
+        simulation.forward_comm();
+        simulation.build_neighbor_list();
+        let mut forces = simulation.compute_forces();
+        simulation.reverse_comm(&mut forces);
 
         for step in 0..num_steps {
-            self.increment_velocity_halfstep(&forces);
-            self.increment_positions();
-            self.simulation.forward_comm();
+            self.increment_velocity_halfstep(simulation, &forces);
+            self.increment_positions(simulation);
+            simulation.forward_comm();
 
-            self.simulation.check_build_neighbor_list(&step);
+            simulation.check_build_neighbor_list(&step);
 
-            let mut forces = self.simulation.compute_forces();
-            self.simulation.reverse_comm(&mut forces);
+            let mut forces = simulation.compute_forces();
+            simulation.reverse_comm(&mut forces);
 
-            self.increment_velocity_halfstep(&forces);
+            self.increment_velocity_halfstep(simulation, &forces);
         }
     }
 }

@@ -1,5 +1,5 @@
 // TODO: update comm, remove args from new, add init?
-use super::{AtomInfo, Domain, NeighborDirection};
+use super::{worker::Worker, AtomInfo, Domain, NeighborDirection};
 use crate::{
     container::BC,
     region::{Rect, Region},
@@ -8,16 +8,16 @@ use crate::{
 
 pub struct Simulation<P: AtomicPotential> {
     pub atoms: Atoms,
-    container: Container,
-    atomic_potential: P,
-    neighbor_list: NeighborList,
+    pub container: Container,
+    pub atomic_potential: P,
+    pub neighbor_list: NeighborList,
     domain: Domain,
     nlocal: usize,
     max_distance_sq: f64,
 }
 
 impl<P: AtomicPotential> Simulation<P> {
-    pub fn new(domain: Domain) -> Self {
+    pub fn new() -> Self {
         let container = Container::new(0., 10., 0.0, 10.0, 0.0, 10.0, BC::PP, BC::PP, BC::PP);
         let neighbor_list = NeighborList::new(&container, 1.0, 1.0, 1.0);
         Self {
@@ -25,11 +25,46 @@ impl<P: AtomicPotential> Simulation<P> {
             container,
             atomic_potential: P::new(),
             neighbor_list,
-            domain,
+            domain: Domain::new(),
             nlocal: 0,
             max_distance_sq: 0.0,
         }
     }
+    pub fn container(&self) -> &Container {
+        &self.container
+    }
+    pub fn atomic_potential(&self) -> &P {
+        &self.atomic_potential
+    }
+    pub fn neighbor_list(&self) -> &NeighborList {
+        &self.neighbor_list
+    }
+    pub fn domain(&self) -> &Domain {
+        &self.domain
+    }
+    pub fn nlocal(&self) -> usize {
+        self.nlocal
+    }
+    pub fn max_distance_sq(&self) -> f64 {
+        self.max_distance_sq
+    }
+    pub fn set_container(&mut self, container: Container) {
+        self.container = container;
+        self.domain.reset_subdomain(&self.container);
+    }
+    pub fn set_atomic_potential(&mut self, atomic_potential: P) {
+        self.atomic_potential = atomic_potential;
+    }
+    pub fn set_neighbor_list(&mut self, neighbor_list: NeighborList) {
+        self.neighbor_list = neighbor_list;
+    }
+    pub fn set_domain(&mut self, domain: Domain) {
+        self.domain = domain;
+    }
+    pub fn init(&mut self, worker: &Worker) {
+        self.domain.init(&self.container, worker);
+    }
+
     pub fn compute_forces(&self) -> Vec<[f64; 3]> {
         self.atomic_potential.compute_forces(&self.atoms)
     }

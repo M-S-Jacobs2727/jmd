@@ -58,7 +58,12 @@ fn bin_atoms(grid: &Grid, positions: &Vec<[f64; 3]>) -> Vec<Vec<usize>> {
 }
 
 impl NeighborList {
-    pub fn new(container: &Container, bin_size: f64, force_distance: f64, skin_distance: f64) -> Self {
+    pub fn new(
+        container: &Container,
+        bin_size: f64,
+        force_distance: f64,
+        skin_distance: f64,
+    ) -> Self {
         let neighbors: Vec<Vec<usize>> = Vec::new();
         assert!(
             force_distance > 0.0,

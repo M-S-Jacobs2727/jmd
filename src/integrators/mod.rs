@@ -4,7 +4,7 @@ pub mod verlet;
 pub use verlet::Verlet;
 
 /// Simulation integrator
-pub trait Integrator<P: AtomicPotential> {
-    fn new(simulation: Simulation<P>) -> Self;
-    fn run(&mut self, num_steps: usize);
+pub trait Integrator {
+    fn new() -> Self;
+    fn run<P: AtomicPotential>(&self, simulation: &mut Simulation<P>, num_steps: usize);
 }
