@@ -1,8 +1,5 @@
 use jmd::{self, Integrator};
-fn run(worker: &mut jmd::worker::Worker) {
-    let mut simulation = jmd::Simulation::new();
-    simulation.init(worker);
-
+fn run(simulation: &mut jmd::Simulation) {
     let rect = jmd::region::Rect::new(0.0, 10.0, 0.0, 10.0, 0.0, 10.0);
     let container = jmd::Container::from_rect(rect.clone());
     simulation.set_container(container);
@@ -16,7 +13,7 @@ fn run(worker: &mut jmd::worker::Worker) {
 
     let mut verlet = jmd::Verlet::new();
     verlet.timestep = 0.005;
-    verlet.run(&mut simulation, 250);
+    verlet.run(simulation, 250);
 }
 
 fn main() -> Result<(), jmd::Error> {

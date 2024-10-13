@@ -5,6 +5,8 @@ use std::{
 
 use crate::{parallel::AtomInfo, Atoms, Container, Error};
 
+use super::Simulation;
+
 pub type ThreadIds = Vec<ThreadId>;
 
 /// Worker-to-Manager messages
@@ -21,7 +23,7 @@ pub enum W2M {
 pub enum M2W {
     Error(Error),
     Setup(Vec<thread::ThreadId>),
-    Run(fn(&mut Worker) -> ()),
+    Run(fn(&mut Simulation) -> ()),
     Sender(Option<mpsc::Sender<AtomInfo>>),
     ProcDims([usize; 3]),
 }
@@ -53,7 +55,11 @@ impl Worker {
 
         let msg = self.rx.recv().unwrap();
         match msg {
-            M2W::Run(f) => f(self),
+            M2W::Run(f) => {
+                let mut sim = Simulation::new();
+                sim.init(self);
+                f(&mut sim)
+            }
             M2W::Error(_) => return,
             _ => panic!("Invalid communication"),
         };

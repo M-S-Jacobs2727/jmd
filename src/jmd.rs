@@ -5,7 +5,7 @@ use std::thread;
 
 use crate::{
     parallel::worker::{Worker, M2W, W2M},
-    Error,
+    Error, Simulation,
 };
 /// Main app, used to run a function through parallel workers
 pub struct Jmd {
@@ -62,7 +62,7 @@ impl Jmd {
             }
         }
     }
-    pub fn run(&mut self, num_threads: usize, f: fn(&mut Worker) -> ()) -> Result<(), Error> {
+    pub fn run(&mut self, num_threads: usize, f: fn(&mut Simulation) -> ()) -> Result<(), Error> {
         self.setup(num_threads);
         for thread in &self.threads {
             thread.send(M2W::Run(f)).unwrap();
