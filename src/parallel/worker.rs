@@ -3,9 +3,8 @@ use std::{
     thread::{self, ThreadId},
 };
 
-use crate::{parallel::AtomInfo, Atoms, Container, Error};
-
 use super::Simulation;
+use crate::{parallel::AtomInfo, Atoms, Container, Error};
 
 pub type ThreadIds = Vec<ThreadId>;
 

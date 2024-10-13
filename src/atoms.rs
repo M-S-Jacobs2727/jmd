@@ -3,6 +3,7 @@ use crate::{
     region::{Region, Regions},
     utils,
 };
+
 /// Atom properties during simulation, not including forces
 pub struct Atoms {
     pub ids: Vec<usize>,

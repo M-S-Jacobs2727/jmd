@@ -1,5 +1,4 @@
 use super::{Grid, UpdateSettings};
-
 use crate::{utils::distance_squared, Container};
 
 /// Used for computing a list of neighboring particles

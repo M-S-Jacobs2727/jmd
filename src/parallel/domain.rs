@@ -1,11 +1,11 @@
+// TODO: Finish procs_in_box, integrate utils::indices
 use std::{
     sync::mpsc,
     thread::{self, ThreadId},
 };
-// TODO: Finish procs_in_box, integrate utils::indices
-use crate::{region::Rect, utils::Direction, Container, NeighborList};
 
 use super::worker::{Worker, M2W, W2M};
+use crate::{region::Rect, utils::Direction, Container, NeighborList};
 
 pub struct AtomInfo {
     pub ids: Vec<usize>,

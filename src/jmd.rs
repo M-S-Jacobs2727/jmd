@@ -1,5 +1,4 @@
 // TODO: add more to handle_messages
-
 use std::sync::mpsc;
 use std::thread;
 
@@ -7,6 +6,7 @@ use crate::{
     parallel::worker::{Worker, M2W, W2M},
     Error, Simulation,
 };
+
 /// Main app, used to run a function through parallel workers
 pub struct Jmd {
     rx: mpsc::Receiver<W2M>,

@@ -1,5 +1,6 @@
-pub mod rect;
 use enum_dispatch::enum_dispatch;
+
+mod rect;
 pub use rect::Rect;
 
 #[enum_dispatch]

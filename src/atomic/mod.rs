@@ -3,8 +3,9 @@ pub mod none;
 
 pub use ljcut::{LJCut, LJCutCoeff};
 
-use crate::Atoms;
 use enum_dispatch::enum_dispatch;
+
+use crate::Atoms;
 use none::None_;
 
 #[enum_dispatch]

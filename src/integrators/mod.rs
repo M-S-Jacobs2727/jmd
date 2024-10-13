@@ -1,7 +1,7 @@
-use crate::parallel::Simulation;
-
 mod verlet;
 pub use verlet::Verlet;
+
+use crate::parallel::Simulation;
 
 /// Simulation integrator
 pub trait Integrator {
