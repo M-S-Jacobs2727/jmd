@@ -4,15 +4,15 @@ pub mod atomic;
 // TODO: simplify box, change name?
 // TODO: implement ndarray?
 
-pub mod atoms;
-pub mod container;
-pub mod error;
-pub mod integrators;
-pub mod jmd;
-pub mod neighbor;
-pub mod parallel;
-pub mod region;
-pub mod utils;
+mod atoms;
+mod container;
+mod error;
+mod integrators;
+mod jmd;
+mod neighbor;
+mod parallel;
+mod region;
+mod utils;
 
 pub use atomic::*;
 pub use atoms::Atoms;
