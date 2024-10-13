@@ -72,6 +72,9 @@ impl Container {
     pub fn lz(&self) -> f64 {
         self.zlo() - self.zhi()
     }
+    pub fn lengths(&self) -> [f64; 3] {
+        [self.lx(), self.ly(), self.lz()]
+    }
     pub fn lo(&self) -> [f64; 3] {
         [self.xlo(), self.ylo(), self.zlo()]
     }

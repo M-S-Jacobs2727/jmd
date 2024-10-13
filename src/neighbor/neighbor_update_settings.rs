@@ -7,11 +7,11 @@ pub struct UpdateSettings {
 }
 
 impl UpdateSettings {
-    pub fn new() -> Self {
+    pub fn new(every: usize, delay: usize, check: bool) -> Self {
         Self {
-            every: 1,
-            delay: 0,
-            check: true,
+            every,
+            delay,
+            check,
             last_update_step: 0,
         }
     }

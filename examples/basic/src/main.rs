@@ -1,30 +1,18 @@
-use jmd::{self, region::Region, AtomicPotential, Integrator, Simulation};
-// TODO: inspect why syntax highlighting won't work
-// TODO: determine best API
+use jmd::{self, Integrator};
 fn run(worker: &mut jmd::worker::Worker) {
-    let mut simulation: Simulation<jmd::LJCut> = jmd::Simulation::new();
+    let mut simulation = jmd::Simulation::new();
     simulation.init(worker);
-    let container = jmd::Container::new(
-        0.0,
-        10.0,
-        0.0,
-        10.0,
-        0.0,
-        10.0,
-        jmd::BC::PP,
-        jmd::BC::PP,
-        jmd::BC::PP,
-    );
+
+    let rect = jmd::region::Rect::new(0.0, 10.0, 0.0, 10.0, 0.0, 10.0);
+    let container = jmd::Container::from_rect(rect.clone());
     simulation.set_container(container);
 
-    let rect = jmd::region::Rect::from_box(simulation.container());
-    simulation
-        .atoms
-        .add_random_atoms(&simulation.container().rect(), 10, 1, 1.0);
+    simulation.atoms.add_random_atoms(&rect.into(), 10, 1, 1.0);
 
     let mut lj = jmd::LJCut::new();
     lj.add_coeff(1, 1, 1.0, 1.0, 2.5).unwrap();
-    simulation.set_atomic_potential(lj);
+    simulation.set_atomic_potential(lj.into());
+    simulation.set_neighbor_settings(jmd::UpdateSettings::new(10, 0, true));
 
     let mut verlet = jmd::Verlet::new();
     verlet.timestep = 0.005;

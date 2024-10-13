@@ -46,90 +46,6 @@ fn linear_to_multi(idx: usize, lengths: &[usize; 3]) -> [usize; 3] {
     [x, y, z]
 }
 
-// // This is given to each thread from the main thread
-// pub struct DistributionInfo {
-//     thread_ids: Vec<ThreadId>,
-//     proc_dimensions: [usize; 3],
-//     me: [usize; 3],
-// }
-// impl DistributionInfo {
-//     pub fn new(thread_ids: Vec<ThreadId>, proc_dimensions: [usize; 3]) -> Self {
-//         let idx = thread_ids
-//             .iter()
-//             .position(|t| *t == thread::current().id())
-//             .expect("Current thread_id not found in given list!");
-//         let me = linear_to_multi(idx, &proc_dimensions);
-//         Self {
-//             thread_ids,
-//             proc_dimensions,
-//             me,
-//         }
-//     }
-//     pub fn xlo(&self) -> &ThreadId {
-//         let xlo_idx = if self.me[0] == 0 {
-//             self.proc_dimensions[0] - 1
-//         } else {
-//             self.me[0] - 1
-//         };
-//         let idx = multi_to_linear(&[xlo_idx, self.me[1], self.me[2]], &self.proc_dimensions);
-//         &self.thread_ids[idx]
-//     }
-//     pub fn xhi(&self) -> &ThreadId {
-//         let xhi_idx = if self.me[0] == self.proc_dimensions[0] - 1 {
-//             0
-//         } else {
-//             self.me[0] + 1
-//         };
-//         let idx = multi_to_linear(&[xhi_idx, self.me[1], self.me[2]], &self.proc_dimensions);
-//         &self.thread_ids[idx]
-//     }
-//     pub fn ylo(&self) -> &ThreadId {
-//         let ylo_idx = if self.me[1] == 0 {
-//             self.proc_dimensions[1] - 1
-//         } else {
-//             self.me[1] - 1
-//         };
-//         let idx = multi_to_linear(&[self.me[0], ylo_idx, self.me[2]], &self.proc_dimensions);
-//         &self.thread_ids[idx]
-//     }
-//     pub fn yhi(&self) -> &ThreadId {
-//         let yhi_idx = if self.me[1] == self.proc_dimensions[1] - 1 {
-//             0
-//         } else {
-//             self.me[1] + 1
-//         };
-//         let idx = multi_to_linear(&[self.me[0], yhi_idx, self.me[2]], &self.proc_dimensions);
-//         &self.thread_ids[idx]
-//     }
-//     pub fn zlo(&self) -> &ThreadId {
-//         let zlo_idx = if self.me[2] == 0 {
-//             self.proc_dimensions[2] - 1
-//         } else {
-//             self.me[2] - 1
-//         };
-//         let idx = multi_to_linear(&[self.me[0], self.me[1], zlo_idx], &self.proc_dimensions);
-//         &self.thread_ids[idx]
-//     }
-//     pub fn zhi(&self) -> &ThreadId {
-//         let zhi_idx = if self.me[2] == self.proc_dimensions[2] - 1 {
-//             0
-//         } else {
-//             self.me[2] + 1
-//         };
-//         let idx = multi_to_linear(&[self.me[0], self.me[1], zhi_idx], &self.proc_dimensions);
-//         &self.thread_ids[idx]
-//     }
-//     pub fn thread_ids(&self) -> &Vec<ThreadId> {
-//         &self.thread_ids
-//     }
-//     pub fn proc_dimensions(&self) -> &[usize; 3] {
-//         &self.proc_dimensions
-//     }
-//     pub fn me(&self) -> &[usize; 3] {
-//         &self.me
-//     }
-// }
-
 /// Message transmitters to the six neighboring processes
 pub struct NeighborProcs<AtomInfo> {
     xlo: Option<mpsc::Sender<AtomInfo>>,
@@ -247,7 +163,7 @@ impl Domain {
     fn setup_neighbor(&mut self, worker: &Worker, direction: Direction, container: &Container) {
         // Get index of neighbor (3d then 1d), if neighbor is present, send Option<mpsc::Sender> to main with proc idx, otherwise None and 0
         // Receive from main Option<mpsc::Sender> for opposite neighbor
-        let idx = self.get_1d_neighbor(&self.my_idx, &direction, container);
+        let idx = self.get_1d_neighbor(&self.my_idx, direction.clone(), container);
         let msg = match idx {
             Some(i) => (Some(self.my_sender.clone()), i),
             None => (None, 0),
@@ -453,67 +369,39 @@ impl Domain {
     fn get_3d_neighbor(
         &self,
         my_idx: &[usize; 3],
-        direction: &Direction,
+        direction: Direction,
         container: &Container,
     ) -> Option<[usize; 3]> {
-        let (across_box, possible_neighbor) = match direction {
-            Direction::Xlo => {
-                if my_idx[0] == 0 {
-                    (true, [self.proc_dimensions[0] - 1, my_idx[1], my_idx[2]])
-                } else {
-                    (false, [my_idx[0] - 1, my_idx[1], my_idx[2]])
-                }
+        let axis_index = direction.axis().index();
+        let across_box = if direction.is_lo() {
+            my_idx[axis_index] == 0
+        } else {
+            my_idx[axis_index] == self.proc_dimensions[axis_index] - 1
+        };
+        let possible_neighbor = match (across_box, direction.is_lo()) {
+            (false, false) => {
+                let mut idx = my_idx.clone();
+                idx[axis_index] += 1;
+                idx
             }
-            Direction::Xhi => {
-                if my_idx[0] == self.proc_dimensions[0] - 1 {
-                    (true, [0, my_idx[1], my_idx[2]])
-                } else {
-                    (false, [my_idx[0] + 1, my_idx[1], my_idx[2]])
-                }
+            (false, true) => {
+                let mut idx = my_idx.clone();
+                idx[axis_index] -= 1;
+                idx
             }
-            Direction::Ylo => {
-                if my_idx[1] == 0 {
-                    (true, [my_idx[0], self.proc_dimensions[1] - 1, my_idx[2]])
-                } else {
-                    (false, [my_idx[0], my_idx[1] - 1, my_idx[2]])
-                }
+            (true, false) => {
+                let mut idx = my_idx.clone();
+                idx[axis_index] = 0;
+                idx
             }
-            Direction::Yhi => {
-                if my_idx[1] == self.proc_dimensions[1] - 1 {
-                    (true, [my_idx[0], 0, my_idx[2]])
-                } else {
-                    (false, [my_idx[0], my_idx[1] + 1, my_idx[2]])
-                }
-            }
-            Direction::Zlo => {
-                if my_idx[2] == 0 {
-                    (true, [my_idx[0], my_idx[1], self.proc_dimensions[2] - 1])
-                } else {
-                    (false, [my_idx[0], my_idx[1], my_idx[2] - 1])
-                }
-            }
-            Direction::Zhi => {
-                if my_idx[2] == self.proc_dimensions[2] - 1 {
-                    (true, [my_idx[0], my_idx[1], 0])
-                } else {
-                    (false, [my_idx[0], my_idx[1], my_idx[2] + 1])
-                }
+            (true, true) => {
+                let mut idx = my_idx.clone();
+                idx[axis_index] = self.proc_dimensions[axis_index] - 1;
+                idx
             }
         };
-        if across_box {
-            let periodic = match direction {
-                Direction::Xlo => container.x().bc().is_periodic(),
-                Direction::Xhi => container.x().bc().is_periodic(),
-                Direction::Ylo => container.y().bc().is_periodic(),
-                Direction::Yhi => container.y().bc().is_periodic(),
-                Direction::Zlo => container.z().bc().is_periodic(),
-                Direction::Zhi => container.z().bc().is_periodic(),
-            };
-            if periodic {
-                Some(possible_neighbor)
-            } else {
-                None
-            }
+        if across_box && !container.is_periodic(direction) {
+            None
         } else {
             Some(possible_neighbor)
         }
@@ -521,7 +409,7 @@ impl Domain {
     fn get_1d_neighbor(
         &self,
         my_idx: &[usize; 3],
-        direction: &Direction,
+        direction: Direction,
         container: &Container,
     ) -> Option<usize> {
         let idx3d = self.get_3d_neighbor(my_idx, direction, container);

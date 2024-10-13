@@ -2,6 +2,7 @@
 use super::{worker::Worker, AtomInfo, Domain};
 use crate::{
     container::BC,
+    neighbor::UpdateSettings,
     region::{Rect, Region},
     utils::Direction,
     AtomicPotential, Atoms, Container, LJCut, NeighborList,
@@ -61,6 +62,9 @@ impl Simulation {
     }
     pub fn set_domain(&mut self, domain: Domain) {
         self.domain = domain;
+    }
+    pub fn set_neighbor_settings(&mut self, neighbor_settings: UpdateSettings) {
+        self.neighbor_list.update_settings = neighbor_settings;
     }
     pub fn init(&mut self, worker: &Worker) {
         self.domain.init(&self.container, worker);

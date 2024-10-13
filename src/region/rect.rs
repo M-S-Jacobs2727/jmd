@@ -2,6 +2,7 @@ use super::Region;
 use crate::Container;
 
 use rand;
+#[derive(Clone, Copy, Debug)]
 /// Rectangular prism region
 pub struct Rect {
     xlo: f64,

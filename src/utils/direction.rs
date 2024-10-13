@@ -1,3 +1,4 @@
+#[derive(Clone, Copy, Debug)]
 pub enum Axis {
     X,
     Y,
@@ -22,6 +23,7 @@ impl Axis {
         }
     }
 }
+#[derive(Clone, Copy, Debug)]
 pub enum Direction {
     Xlo,
     Xhi,
@@ -43,12 +45,9 @@ impl Direction {
     }
     pub fn axis(&self) -> Axis {
         match self {
-            Direction::Xlo => Axis::X,
-            Direction::Xhi => Axis::X,
-            Direction::Ylo => Axis::Y,
-            Direction::Yhi => Axis::Y,
-            Direction::Zlo => Axis::Z,
-            Direction::Zhi => Axis::Z,
+            Direction::Xlo | Direction::Xhi => Axis::X,
+            Direction::Ylo | Direction::Yhi => Axis::Y,
+            Direction::Zlo | Direction::Zhi => Axis::Z,
         }
     }
     pub fn index(&self) -> usize {
@@ -59,6 +58,12 @@ impl Direction {
             Direction::Yhi => 3,
             Direction::Zlo => 4,
             Direction::Zhi => 5,
+        }
+    }
+    pub fn is_lo(&self) -> bool {
+        match self {
+            Direction::Xlo | Direction::Ylo | Direction::Zlo => true,
+            _ => false,
         }
     }
 }

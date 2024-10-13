@@ -83,7 +83,7 @@ impl NeighborList {
             neighbor_distance: cutoff_distance,
             stencil,
             neighbors,
-            update_settings: UpdateSettings::new(),
+            update_settings: UpdateSettings::new(1, 0, true),
         }
     }
     pub fn neighbors(&self) -> &Vec<Vec<usize>> {
