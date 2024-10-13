@@ -1,4 +1,4 @@
-use crate::{parallel::Simulation, AtomicPotential};
+use crate::parallel::Simulation;
 
 pub mod verlet;
 pub use verlet::Verlet;
@@ -6,5 +6,5 @@ pub use verlet::Verlet;
 /// Simulation integrator
 pub trait Integrator {
     fn new() -> Self;
-    fn run<P: AtomicPotential>(&self, simulation: &mut Simulation<P>, num_steps: usize);
+    fn run(&self, simulation: &mut Simulation, num_steps: usize);
 }

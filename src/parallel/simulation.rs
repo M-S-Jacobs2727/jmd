@@ -3,27 +3,27 @@ use super::{worker::Worker, AtomInfo, Domain, NeighborDirection};
 use crate::{
     container::BC,
     region::{Rect, Region},
-    AtomicPotential, Atoms, Container, NeighborList,
+    AtomicPotential, Atoms, Container, LJCut, NeighborList,
 };
 
-pub struct Simulation<P: AtomicPotential> {
+pub struct Simulation {
     pub atoms: Atoms,
     pub container: Container,
-    pub atomic_potential: P,
+    pub atomic_potential: crate::AP,
     pub neighbor_list: NeighborList,
     domain: Domain,
     nlocal: usize,
     max_distance_sq: f64,
 }
 
-impl<P: AtomicPotential> Simulation<P> {
+impl Simulation {
     pub fn new() -> Self {
         let container = Container::new(0., 10., 0.0, 10.0, 0.0, 10.0, BC::PP, BC::PP, BC::PP);
         let neighbor_list = NeighborList::new(&container, 1.0, 1.0, 1.0);
         Self {
             atoms: Atoms::new(),
             container,
-            atomic_potential: P::new(),
+            atomic_potential: crate::AP::LJ(LJCut::new()),
             neighbor_list,
             domain: Domain::new(),
             nlocal: 0,
@@ -33,7 +33,7 @@ impl<P: AtomicPotential> Simulation<P> {
     pub fn container(&self) -> &Container {
         &self.container
     }
-    pub fn atomic_potential(&self) -> &P {
+    pub fn atomic_potential(&self) -> &crate::AP {
         &self.atomic_potential
     }
     pub fn neighbor_list(&self) -> &NeighborList {
@@ -52,7 +52,7 @@ impl<P: AtomicPotential> Simulation<P> {
         self.container = container;
         self.domain.reset_subdomain(&self.container);
     }
-    pub fn set_atomic_potential(&mut self, atomic_potential: P) {
+    pub fn set_atomic_potential(&mut self, atomic_potential: crate::AP) {
         self.atomic_potential = atomic_potential;
     }
     pub fn set_neighbor_list(&mut self, neighbor_list: NeighborList) {

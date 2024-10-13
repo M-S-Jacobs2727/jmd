@@ -1,8 +1,8 @@
 pub mod atomic;
 // TODO: determine API
 // TODO: make sure that all private members have public getters
-// TODO: look into using dyn AtomicPotential instead of generic (lots of potentials will make library larger)
 // TODO: simplify box, change name?
+// TODO: implement ndarray?
 
 pub mod atoms;
 pub mod container;
