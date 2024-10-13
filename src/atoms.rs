@@ -1,4 +1,8 @@
-use crate::{neighbor, utils};
+use crate::{
+    neighbor,
+    region::{Region, Regions},
+    utils,
+};
 /// Atom properties during simulation, not including forces
 pub struct Atoms {
     pub ids: Vec<usize>,
@@ -71,5 +75,26 @@ impl Atoms {
             .iter()
             .map(|coord| bins.bin_idx_from_3d_idx(&bins.coord_to_3d_idx(coord)))
             .collect();
+    }
+    pub fn add_random_atoms(
+        &mut self,
+        region: &Regions,
+        num_atoms: usize,
+        atom_type: u32,
+        mass: f64,
+    ) {
+        let atom_id = self.ids().iter().max().unwrap_or(&0) + 1;
+        self.ids.extend(atom_id..atom_id + num_atoms);
+        self.types.reserve(num_atoms);
+        self.positions.reserve(num_atoms);
+        self.velocities.reserve(num_atoms);
+        self.masses.reserve(num_atoms);
+
+        for _i in 0..num_atoms {
+            self.types.push(atom_type);
+            self.masses.push(mass);
+            self.velocities.push([0.0, 0.0, 0.0]);
+            self.positions.push(region.get_random_coord())
+        }
     }
 }

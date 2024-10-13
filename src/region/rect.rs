@@ -69,31 +69,13 @@ impl Region for Rect {
             && self.zlo <= coord[2]
             && coord[2] <= self.zhi
     }
+    fn get_random_coord(&self) -> [f64; 3] {
+        [
+            rand::random::<f64>() * self.lx() + self.xlo,
+            rand::random::<f64>() * self.ly() + self.ylo,
+            rand::random::<f64>() * self.lz() + self.zlo,
+        ]
+    }
     // Move this to atoms, takes Region
     // Add function for get_random_coord
-    fn add_random_atoms(
-        &self,
-        sim: &mut super::Atoms,
-        num_atoms: usize,
-        atom_type: u32,
-        mass: f64,
-    ) {
-        let atom_id = sim.ids().iter().max().unwrap_or(&0) + 1;
-        sim.ids.extend(atom_id..atom_id + num_atoms);
-        sim.types.reserve(num_atoms);
-        sim.positions.reserve(num_atoms);
-        sim.velocities.reserve(num_atoms);
-        sim.masses.reserve(num_atoms);
-
-        for _i in 0..num_atoms {
-            sim.types.push(atom_type);
-            sim.masses.push(mass);
-            sim.velocities.push([0.0, 0.0, 0.0]);
-            sim.positions.push([
-                rand::random::<f64>() * self.lx() + self.xlo,
-                rand::random::<f64>() * self.ly() + self.ylo,
-                rand::random::<f64>() * self.lz() + self.zlo,
-            ])
-        }
-    }
 }

@@ -18,7 +18,9 @@ fn run(worker: &mut jmd::worker::Worker) {
     simulation.set_container(container);
 
     let rect = jmd::region::Rect::from_box(simulation.container());
-    rect.add_random_atoms(&mut simulation.atoms, 10, 1, 1.0);
+    simulation
+        .atoms
+        .add_random_atoms(&simulation.container().rect(), 10, 1, 1.0);
 
     let mut lj = jmd::LJCut::new();
     lj.add_coeff(1, 1, 1.0, 1.0, 2.5).unwrap();

@@ -1,5 +1,7 @@
 // TODO: add is_periodic function to Box, taking NeighborDirection
 
+use crate::region::Rect;
+
 /// Boundary conditions for simulation box.
 ///
 /// P: Periodic (must be set for both sides)
@@ -86,20 +88,16 @@ impl Container {
             },
         }
     }
-    // pub fn subdomain(&self, distribution_info: &DistributionInfo) -> Rect {
-    //     let lx = self.lx() / (distribution_info.proc_dimensions()[0] as f64);
-    //     let ly = self.ly() / (distribution_info.proc_dimensions()[1] as f64);
-    //     let lz = self.lz() / (distribution_info.proc_dimensions()[2] as f64);
-    //     let me = distribution_info.me();
-    //     Rect::new(
-    //         lx * (me[0] as f64),
-    //         lx * (me[0] as f64 + 1f64),
-    //         ly * (me[1] as f64),
-    //         ly * (me[1] as f64 + 1f64),
-    //         lz * (me[2] as f64),
-    //         lz * (me[2] as f64 + 1f64),
-    //     )
-    // }
+    pub fn rect(&self) -> Rect {
+        Rect::new(
+            self.xlo(),
+            self.xhi(),
+            self.ylo(),
+            self.yhi(),
+            self.zlo(),
+            self.zhi(),
+        )
+    }
     pub fn x(&self) -> &Bounds {
         &self.x
     }
