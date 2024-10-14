@@ -6,8 +6,8 @@ fn run(simulation: &mut jmd::Simulation) {
 
     simulation.atoms.add_random_atoms(&rect.into(), 10, 1, 1.0);
 
-    let mut lj = jmd::LJCut::new();
-    lj.add_coeff(1, 1, 1.0, 1.0, 2.5).unwrap();
+    let mut lj = jmd::LJCut::new(1);
+    lj.add_coeff(1.into(), 1.into(), 1.0, 1.0, 2.5).unwrap();
     simulation.set_atomic_potential(lj.into());
     simulation.set_neighbor_settings(jmd::UpdateSettings::new(10, 0, true));
 

@@ -1,11 +1,10 @@
-/// Group of useful computations
 pub mod computations;
 mod direction;
 pub mod indices;
-/// Sorting algorithms
 pub mod sort;
-pub mod type_range;
+mod types;
 
 pub use computations::*;
-pub use direction::{Axis, Direction};
+pub use direction::*;
 pub use sort::*;
+pub use types::Types;

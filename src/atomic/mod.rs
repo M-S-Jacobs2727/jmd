@@ -6,7 +6,7 @@ pub use ljcut::{LJCut, LJCutCoeff};
 
 use enum_dispatch::enum_dispatch;
 
-use crate::Atoms;
+use crate::{Atoms, Error};
 use none::None_;
 
 #[enum_dispatch]
@@ -22,4 +22,7 @@ pub trait AtomicPotentialTrait {
 
     /// Compute the pairwise force given a configuration of atoms
     fn compute_forces(&self, atoms: &Atoms) -> Vec<[f64; 3]>;
+
+    /// Increase or decrease the number of atom types
+    fn set_num_types(&mut self, num_types: u32) -> Result<(), Error>;
 }

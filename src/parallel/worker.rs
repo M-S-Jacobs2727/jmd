@@ -52,7 +52,7 @@ impl Worker {
         let msg = self.rx.recv().unwrap();
         match msg {
             M2W::Run(f) => {
-                let mut sim = Simulation::new();
+                let mut sim = Simulation::new(0);
                 sim.init(self);
                 f(&mut sim)
             }

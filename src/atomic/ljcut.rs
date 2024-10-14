@@ -1,6 +1,7 @@
 use super::AtomicPotentialTrait;
-use crate::{Atoms, Error};
+use crate::{utils::Types, Atoms, Error};
 
+#[derive(Clone, Copy)]
 pub struct LJCutCoeff {
     sigma: f64,
     epsilon: f64,
@@ -31,7 +32,7 @@ impl LJCutCoeff {
         self.rcut
     }
 }
-// TODO: add support for ranges
+
 /// Lennard-Jones 12-6 potential
 pub struct LJCut {
     num_types: u32,
@@ -39,28 +40,44 @@ pub struct LJCut {
     type_pairs: Vec<[u32; 2]>,
 }
 impl LJCut {
-    pub fn new() -> Self {
+    pub fn new(num_types: u32) -> Self {
         Self {
-            num_types: 0,
+            num_types,
             coeffs: Vec::new(),
             type_pairs: Vec::new(),
         }
     }
     pub fn add_coeff(
         &mut self,
-        type_i: u32,
-        type_j: u32,
+        type_i: Types,
+        type_j: Types,
         sigma: f64,
         epsilon: f64,
         rcut: f64,
     ) -> Result<(), Error> {
-        if self.type_pairs.contains(&[type_i, type_j])
-            || self.type_pairs.contains(&[type_j, type_i])
-        {
-            return Err(Error::AtomicPotentialError);
+        let itypes = type_i.to_range();
+        let mut jtypes = type_j.to_range();
+        let mut type_pairs: Vec<[u32; 2]> = Vec::new();
+        for i in itypes {
+            if i >= self.num_types {
+                return Err(Error::AtomicPotentialError);
+            }
+            for j in jtypes.by_ref() {
+                if self.type_pairs.contains(&[i, j])
+                    || self.type_pairs.contains(&[j, i])
+                    || j >= self.num_types
+                {
+                    return Err(Error::AtomicPotentialError);
+                }
+                type_pairs.push([i, j]);
+            }
         }
-        self.type_pairs.push([type_i, type_j]);
-        self.coeffs.push(LJCutCoeff::new(sigma, epsilon, rcut));
+
+        self.type_pairs.append(&mut type_pairs);
+        self.coeffs.resize(
+            self.coeffs.len() + type_pairs.len(),
+            LJCutCoeff::new(sigma, epsilon, rcut),
+        );
         Ok(())
     }
     fn type_index(&self, typei: u32, typej: u32) -> usize {
@@ -116,5 +133,24 @@ impl AtomicPotentialTrait for LJCut {
         }
 
         forces
+    }
+    fn set_num_types(&mut self, num_types: u32) -> Result<(), Error> {
+        if self.type_pairs.is_empty() {
+            self.num_types = num_types;
+            return Ok(());
+        }
+        let max_type = self
+            .type_pairs
+            .iter()
+            .map(|[i, j]| *i.max(j))
+            .max()
+            .unwrap();
+
+        if max_type >= num_types {
+            Err(Error::AtomicPotentialError)
+        } else {
+            self.num_types = num_types;
+            Ok(())
+        }
     }
 }
