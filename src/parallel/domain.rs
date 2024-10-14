@@ -1,4 +1,4 @@
-// TODO: Finish procs_in_box, integrate utils::indices
+// TODO: integrate utils::indices
 use std::{
     sync::mpsc,
     thread::{self, ThreadId},
@@ -83,33 +83,35 @@ impl<AtomInfo> NeighborProcs<AtomInfo> {
     }
 }
 
-fn all_factors(n: &usize) -> Vec<usize> {
-    (2..n + 1).filter(|i| n % i == 0).collect()
-}
-// TODO: Finish this function
 /// Determine and return the best configuration of processes to
 /// reduce surface area for communication
 fn procs_in_box(nprocs: usize, lx: f64, ly: f64, lz: f64) -> [usize; 3] {
-    // n1 * n2 * n3 = N, lx * ly * lz = V
-    // ni = curt(N/V) * li
-    let volume = lx * ly * lz;
-    let fraction = nprocs as f64 / volume;
-    let proc_estimates = [
-        lx * fraction.cbrt(),
-        ly * fraction.cbrt(),
-        lz * fraction.cbrt(),
-    ];
-    let factors = all_factors(&nprocs);
-    let i = factors
-        .iter()
-        .position(|f| proc_estimates[0] < *f as f64)
-        .unwrap_or(factors.len() - 1);
-    let [factor_lo, factor_hi] = if i == 0 {
-        [factors[0], factors[1]]
-    } else {
-        [factors[i - 1], factors[i]]
+    // This score is proportional to the surface area and therefore should be minimized
+    let score = |nx: usize, ny: usize, nz: usize| {
+        lx * ly / (nx * ny) as f64 + ly * lz / (ny * nz) as f64 + lx * lz / (nx * nz) as f64
     };
-    todo!()
+
+    let factors: Vec<usize> = (1..=nprocs).filter(|i| nprocs % i == 0).collect();
+    let (i, j, _) = factors
+        .clone()
+        .iter()
+        .enumerate()
+        .map(|(i, &nx)| {
+            factors
+                .iter()
+                .enumerate()
+                .filter(|(_, &ny)| ny * nx <= nprocs && nprocs % (ny * nx) == 0)
+                .map(|(j, &ny)| {
+                    let nz = nprocs / nx / ny;
+                    (i, j, score(nx, ny, nz))
+                })
+                .reduce(|x, y| if x.2 < y.2 { x } else { y })
+                .unwrap_or((usize::MAX, usize::MAX, f64::MAX))
+        })
+        .reduce(|x, y| if x.2 < y.2 { x } else { y })
+        .unwrap();
+
+    [factors[i], factors[j], nprocs / factors[i] / factors[j]]
 }
 
 /// Represents a process in relation to the other neighboring processes
