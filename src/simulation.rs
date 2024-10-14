@@ -1,6 +1,6 @@
 use crate::{
     parallel::{AtomInfo, Domain, Worker},
-    region::{Rect, Region},
+    region::{Rect, RegionTrait},
     AtomicPotential, AtomicPotentialTrait, Atoms, Container, Direction, LJCut, NeighborList,
     UpdateSettings, BC,
 };

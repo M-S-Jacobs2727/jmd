@@ -1,6 +1,6 @@
 use crate::{
     neighbor,
-    region::{Region, Regions},
+    region::{Region, RegionTrait},
     utils,
 };
 
@@ -79,7 +79,7 @@ impl Atoms {
     }
     pub fn add_random_atoms(
         &mut self,
-        region: &Regions,
+        region: &Region,
         num_atoms: usize,
         atom_type: u32,
         mass: f64,
