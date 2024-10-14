@@ -4,23 +4,11 @@ use std::{
     thread::{self, ThreadId},
 };
 
-use super::worker::{Worker, M2W, W2M};
+use super::{
+    worker::{Worker, M2W, W2M},
+    AdjacentProcs, AtomInfo,
+};
 use crate::{region::Rect, utils::Direction, Container, NeighborList};
-
-pub struct AtomInfo {
-    pub ids: Vec<usize>,
-    pub types: Vec<u32>,
-    pub data: Vec<f64>,
-}
-impl AtomInfo {
-    pub fn new() -> Self {
-        Self {
-            ids: Vec::new(),
-            types: Vec::new(),
-            data: Vec::new(),
-        }
-    }
-}
 
 /// Transform a linear index of a L*M*N vector to a 3D index of a LxMxN array
 fn multi_to_linear(idx: &[usize; 3], lengths: &[usize; 3]) -> usize {
@@ -44,43 +32,6 @@ fn linear_to_multi(idx: usize, lengths: &[usize; 3]) -> [usize; 3] {
     let y = r % ny;
     let x = r / ny;
     [x, y, z]
-}
-
-/// Message transmitters to the six neighboring processes
-pub struct NeighborProcs<AtomInfo> {
-    xlo: Option<mpsc::Sender<AtomInfo>>,
-    xhi: Option<mpsc::Sender<AtomInfo>>,
-    ylo: Option<mpsc::Sender<AtomInfo>>,
-    yhi: Option<mpsc::Sender<AtomInfo>>,
-    zlo: Option<mpsc::Sender<AtomInfo>>,
-    zhi: Option<mpsc::Sender<AtomInfo>>,
-}
-impl<AtomInfo> NeighborProcs<AtomInfo> {
-    pub fn new() -> Self {
-        Self {
-            xlo: None,
-            xhi: None,
-            ylo: None,
-            yhi: None,
-            zlo: None,
-            zhi: None,
-        }
-    }
-    pub fn as_vec(&self) -> Vec<&Option<mpsc::Sender<AtomInfo>>> {
-        vec![
-            &self.xlo, &self.xhi, &self.ylo, &self.yhi, &self.zlo, &self.zhi,
-        ]
-    }
-    pub fn set(&mut self, direction: Direction, sender: mpsc::Sender<AtomInfo>) {
-        match direction {
-            Direction::Xlo => self.xlo = Some(sender),
-            Direction::Xhi => self.xhi = Some(sender),
-            Direction::Ylo => self.ylo = Some(sender),
-            Direction::Yhi => self.yhi = Some(sender),
-            Direction::Zlo => self.zlo = Some(sender),
-            Direction::Zhi => self.zhi = Some(sender),
-        };
-    }
 }
 
 /// Determine and return the best configuration of processes to
@@ -118,7 +69,7 @@ fn procs_in_box(nprocs: usize, lx: f64, ly: f64, lz: f64) -> [usize; 3] {
 pub struct Domain {
     receiver: mpsc::Receiver<AtomInfo>,
     my_sender: mpsc::Sender<AtomInfo>,
-    neighbor_procs: NeighborProcs<AtomInfo>,
+    procs: AdjacentProcs,
     thread_ids: Vec<ThreadId>,
     subdomain: Rect,
     proc_dimensions: [usize; 3],
@@ -126,13 +77,13 @@ pub struct Domain {
 }
 impl Domain {
     pub fn new() -> Self {
-        let neighbor_procs: NeighborProcs<AtomInfo> = NeighborProcs::new();
+        let neighbor_procs: AdjacentProcs = AdjacentProcs::new();
         let (my_sender, receiver) = mpsc::channel();
 
         Self {
             receiver,
             my_sender,
-            neighbor_procs,
+            procs: neighbor_procs,
             thread_ids: Vec::new(),
             subdomain: Rect::new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
             proc_dimensions: [0, 0, 0],
@@ -173,7 +124,7 @@ impl Domain {
         worker.send(W2M::Sender(msg.0, msg.1)).unwrap();
         let msg = worker.recv();
         match msg {
-            Ok(M2W::Sender(Some(sender))) => self.neighbor_procs.set(direction.opposite(), sender),
+            Ok(M2W::Sender(Some(sender))) => self.procs.set(direction.opposite(), sender),
             Ok(M2W::Sender(None)) => {}
             Ok(_) => panic!("Invalid message"),
             _ => panic!("Disconnect error"),
@@ -322,11 +273,11 @@ impl Domain {
     pub fn receiver(&self) -> &mpsc::Receiver<AtomInfo> {
         &self.receiver
     }
-    pub fn neighbor_procs(&self) -> &NeighborProcs<AtomInfo> {
-        &self.neighbor_procs
+    pub fn neighbor_procs(&self) -> &AdjacentProcs {
+        &self.procs
     }
     pub fn set_neighbor_proc(&mut self, direction: Direction, sender: mpsc::Sender<AtomInfo>) {
-        self.neighbor_procs.set(direction, sender);
+        self.procs.set(direction, sender);
     }
     pub fn set_thread_ids(&mut self, thread_ids: Vec<ThreadId>) {
         self.thread_ids = thread_ids;
@@ -335,7 +286,7 @@ impl Domain {
         &self.thread_ids
     }
     pub fn num_neighbors(&self) -> usize {
-        self.neighbor_procs
+        self.procs
             .as_vec()
             .iter()
             .filter(|&&p| (*p).is_some())
@@ -356,12 +307,12 @@ impl Domain {
         neighbor: Direction,
     ) -> Result<(), mpsc::SendError<AtomInfo>> {
         let n = match neighbor {
-            Direction::Xlo => self.neighbor_procs.xlo.as_ref(),
-            Direction::Xhi => self.neighbor_procs.xhi.as_ref(),
-            Direction::Ylo => self.neighbor_procs.ylo.as_ref(),
-            Direction::Yhi => self.neighbor_procs.yhi.as_ref(),
-            Direction::Zlo => self.neighbor_procs.zlo.as_ref(),
-            Direction::Zhi => self.neighbor_procs.zhi.as_ref(),
+            Direction::Xlo => self.procs.xlo(),
+            Direction::Xhi => self.procs.xhi(),
+            Direction::Ylo => self.procs.ylo(),
+            Direction::Yhi => self.procs.yhi(),
+            Direction::Zlo => self.procs.zlo(),
+            Direction::Zhi => self.procs.zhi(),
         };
         match n {
             Some(s) => s.send(value),
