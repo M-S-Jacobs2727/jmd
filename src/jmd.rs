@@ -3,7 +3,7 @@ use std::sync::mpsc;
 use std::thread;
 
 use crate::{
-    parallel::worker::{Worker, M2W, W2M},
+    parallel::{Worker, M2W, W2M},
     Error, Simulation,
 };
 

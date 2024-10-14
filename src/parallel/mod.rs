@@ -1,6 +1,5 @@
-pub mod domain;
-pub mod simulation;
-pub mod worker;
+mod domain;
+mod worker;
 
 pub use domain::{AtomInfo, Domain};
-pub use simulation::Simulation;
+pub use worker::{Worker, M2W, W2M};

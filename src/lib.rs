@@ -12,7 +12,8 @@ mod jmd;
 mod neighbor;
 mod parallel;
 pub mod region;
-pub mod utils;
+mod simulation;
+mod utils;
 
 pub use atomic::*;
 pub use atoms::Atoms;
@@ -21,5 +22,5 @@ pub use error::Error;
 pub use integrators::*;
 pub use jmd::Jmd;
 pub use neighbor::{NeighborList, UpdateSettings};
-pub use parallel::*;
+pub use simulation::Simulation;
 pub use utils::{Axis, Direction};

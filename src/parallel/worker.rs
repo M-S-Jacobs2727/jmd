@@ -3,10 +3,7 @@ use std::{
     thread::{self, ThreadId},
 };
 
-use super::Simulation;
-use crate::{parallel::AtomInfo, Atoms, Container, Error};
-
-pub type ThreadIds = Vec<ThreadId>;
+use crate::{parallel::AtomInfo, Atoms, Container, Error, Simulation};
 
 /// Worker-to-Manager messages
 pub enum W2M {

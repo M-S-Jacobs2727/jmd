@@ -1,11 +1,7 @@
-// TODO: update comm, remove args from new, add init?
-use super::{worker::Worker, AtomInfo, Domain};
 use crate::{
-    container::BC,
-    neighbor::UpdateSettings,
+    parallel::{AtomInfo, Domain, Worker},
     region::{Rect, Region},
-    utils::Direction,
-    AtomicPotential, Atoms, Container, LJCut, NeighborList,
+    AtomicPotential, Atoms, Container, Direction, LJCut, NeighborList, UpdateSettings, BC,
 };
 
 pub struct Simulation {
