@@ -1,4 +1,4 @@
-use super::AtomicPotential;
+use super::AtomicPotentialTrait;
 use crate::{Atoms, Error};
 
 pub struct LJCutCoeff {
@@ -70,7 +70,7 @@ impl LJCut {
     }
 }
 
-impl AtomicPotential for LJCut {
+impl AtomicPotentialTrait for LJCut {
     fn cutoff_distance(&self) -> f64 {
         self.coeffs
             .iter()

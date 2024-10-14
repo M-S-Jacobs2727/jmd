@@ -1,13 +1,14 @@
 use crate::{
     parallel::{AtomInfo, Domain, Worker},
     region::{Rect, Region},
-    AtomicPotential, Atoms, Container, Direction, LJCut, NeighborList, UpdateSettings, BC,
+    AtomicPotential, AtomicPotentialTrait, Atoms, Container, Direction, LJCut, NeighborList,
+    UpdateSettings, BC,
 };
 
 pub struct Simulation {
     pub atoms: Atoms,
     pub container: Container,
-    pub atomic_potential: crate::AP,
+    pub atomic_potential: AtomicPotential,
     pub neighbor_list: NeighborList,
     domain: Domain,
     nlocal: usize,
@@ -31,7 +32,7 @@ impl Simulation {
     pub fn container(&self) -> &Container {
         &self.container
     }
-    pub fn atomic_potential(&self) -> &crate::AP {
+    pub fn atomic_potential(&self) -> &crate::AtomicPotential {
         &self.atomic_potential
     }
     pub fn neighbor_list(&self) -> &NeighborList {
@@ -50,7 +51,7 @@ impl Simulation {
         self.container = container;
         self.domain.reset_subdomain(&self.container);
     }
-    pub fn set_atomic_potential(&mut self, atomic_potential: crate::AP) {
+    pub fn set_atomic_potential(&mut self, atomic_potential: AtomicPotential) {
         self.atomic_potential = atomic_potential;
     }
     pub fn set_neighbor_list(&mut self, neighbor_list: NeighborList) {

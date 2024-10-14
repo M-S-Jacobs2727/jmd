@@ -1,4 +1,4 @@
-use super::AtomicPotential;
+use super::AtomicPotentialTrait;
 use crate::Atoms;
 
 pub struct None_ {}
@@ -7,7 +7,7 @@ impl None_ {
         Self {}
     }
 }
-impl AtomicPotential for None_ {
+impl AtomicPotentialTrait for None_ {
     fn cutoff_distance(&self) -> f64 {
         0.0
     }

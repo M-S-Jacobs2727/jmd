@@ -1,3 +1,4 @@
+// TODO: add num_types to new method
 pub mod ljcut;
 pub mod none;
 
@@ -9,14 +10,13 @@ use crate::Atoms;
 use none::None_;
 
 #[enum_dispatch]
-pub enum AP {
+pub enum AtomicPotential {
     LJCut,
     None_,
 }
-// TODO: add num_types to new method
-#[enum_dispatch(AP)]
+#[enum_dispatch(AtomicPotential)]
 /// Trait for pairwise atomic potentials
-pub trait AtomicPotential {
+pub trait AtomicPotentialTrait {
     /// Get the maximum distance for effective interaction
     fn cutoff_distance(&self) -> f64;
 

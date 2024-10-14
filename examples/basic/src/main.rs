@@ -1,4 +1,4 @@
-use jmd::{self, Integrator};
+use jmd;
 fn run(simulation: &mut jmd::Simulation) {
     let rect = jmd::region::Rect::new(0.0, 10.0, 0.0, 10.0, 0.0, 10.0);
     let container = jmd::Container::from_rect(rect.clone());

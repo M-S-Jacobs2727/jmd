@@ -7,6 +7,9 @@ pub struct Verlet {
 }
 
 impl Verlet {
+    pub fn new() -> Self {
+        Self { timestep: 0.005 }
+    }
     /// Steps the velocities of the simulation by half a timestep
     fn increment_velocity_halfstep(&self, simulation: &mut Simulation, forces: &Vec<[f64; 3]>) {
         for i in 0..simulation.atoms.num_atoms() {
@@ -42,9 +45,6 @@ impl Verlet {
 }
 
 impl Integrator for Verlet {
-    fn new() -> Self {
-        Self { timestep: 0.005 }
-    }
     fn run(&self, simulation: &mut Simulation, num_steps: usize) {
         simulation.forward_comm();
         simulation.build_neighbor_list();
