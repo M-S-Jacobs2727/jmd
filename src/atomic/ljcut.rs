@@ -41,12 +41,17 @@ pub struct LJCut {
     coeff_set: Vec<bool>,
 }
 impl LJCut {
-    pub fn new() -> Self {
+    pub fn new(num_types: usize, force_cutoff: f64) -> Self {
+        let new_len = num_types * num_types;
+        let mut coeffs: Vec<LJCutCoeff> = Vec::new();
+        let mut coeff_set: Vec<bool> = Vec::new();
+        coeffs.resize(new_len, LJCut::default_coeff());
+        coeff_set.resize(new_len, false);
         Self {
-            num_types: 0,
-            force_cutoff: 2.5,
-            coeffs: Vec::new(),
-            coeff_set: Vec::new(),
+            num_types,
+            force_cutoff,
+            coeffs,
+            coeff_set,
         }
     }
     pub fn set_coeff(
@@ -79,7 +84,7 @@ impl LJCut {
     pub fn all_set(&self) -> bool {
         self.coeff_set.iter().all(|&x| x)
     }
-    fn default_coeff(&self) -> LJCutCoeff {
+    fn default_coeff() -> LJCutCoeff {
         LJCutCoeff::new(0.0, 0.0, 0.0)
     }
 }
@@ -135,7 +140,7 @@ impl AtomicPotentialTrait for LJCut {
         if self.num_types == 0 {
             self.num_types = num_types;
             self.coeff_set.resize(new_len, false);
-            self.coeffs.resize(new_len, self.default_coeff());
+            self.coeffs.resize(new_len, LJCut::default_coeff());
             return Ok(());
         }
 
@@ -166,7 +171,7 @@ impl AtomicPotentialTrait for LJCut {
 
         if self.num_types < num_types {
             // Adding more types: Resize first, then shift coeffs
-            self.coeffs.resize(new_len, self.default_coeff());
+            self.coeffs.resize(new_len, LJCut::default_coeff());
             self.coeff_set.resize(new_len, false);
             for [i, j] in set_indices.iter().rev() {
                 let old_idx = i * self.num_types + j;
@@ -182,7 +187,7 @@ impl AtomicPotentialTrait for LJCut {
                 self.coeffs.swap(old_idx, new_idx);
                 self.coeff_set.swap(old_idx, new_idx);
             }
-            self.coeffs.resize(new_len, self.default_coeff());
+            self.coeffs.resize(new_len, LJCut::default_coeff());
             self.coeff_set.resize(new_len, false);
         }
 

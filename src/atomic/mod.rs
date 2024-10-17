@@ -1,13 +1,12 @@
-// TODO: add num_types to new method
 mod ljcut;
 mod none;
 
 pub use ljcut::LJCut;
+pub use none::None_;
 
 use enum_dispatch::enum_dispatch;
 
 use crate::{Atoms, Error};
-use none::None_;
 
 #[enum_dispatch]
 pub enum AtomicPotential {

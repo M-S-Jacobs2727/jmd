@@ -1,7 +1,7 @@
 use crate::{
     parallel::{AtomInfo, Domain, Worker},
     region::{Rect, RegionTrait},
-    AtomicPotential, AtomicPotentialTrait, Atoms, Container, Direction, Error, LJCut, NeighborList,
+    AtomicPotential, AtomicPotentialTrait, Atoms, Container, Direction, Error, NeighborList, None_,
     UpdateSettings, BC,
 };
 
@@ -22,7 +22,7 @@ impl Simulation {
         Self {
             atoms: Atoms::new(),
             container,
-            atomic_potential: LJCut::new().into(),
+            atomic_potential: None_::new().into(),
             neighbor_list,
             domain: Domain::new(),
             nlocal: 0,
