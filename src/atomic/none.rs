@@ -20,4 +20,7 @@ impl AtomicPotentialTrait for None_ {
     fn set_num_types(&mut self, _num_types: usize) -> Result<(), crate::Error> {
         Ok(())
     }
+    fn num_types(&self) -> usize {
+        0
+    }
 }

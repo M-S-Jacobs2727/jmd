@@ -59,8 +59,8 @@ impl LJCut {
     ) -> Result<(), Error> {
         let itypes = type_i.to_vec();
         let jtypes = type_j.to_vec();
-        if itypes.iter().any(|&t| t >= self.num_types)
-            || jtypes.iter().any(|&t| t >= self.num_types)
+        if itypes.iter().any(|&t| t as usize >= self.num_types)
+            || jtypes.iter().any(|&t| t as usize >= self.num_types)
         {
             return Err(Error::AtomicPotentialError);
         }
@@ -68,7 +68,7 @@ impl LJCut {
         let coeff = LJCutCoeff::new(sigma, epsilon, rcut);
         for i in &itypes {
             for j in &jtypes {
-                let index = (i * self.num_types + j) as usize;
+                let index = self.type_idx(*i, *j);
                 self.coeff_set[index] = true;
                 self.coeffs[index] = coeff.clone();
             }
@@ -106,7 +106,7 @@ impl AtomicPotentialTrait for LJCut {
 
                 let typej = &atoms.types[j];
                 let posj = &atoms.positions[j];
-                let coeff = self.coeffs[self.num_types * *typei as usize + *typej as usize];
+                let coeff = self.coeffs[self.type_idx(*typei, *typej)];
                 let r = [posi[0] - posj[0], posi[1] - posj[1], posi[2] - posj[2]];
                 let r2 = r[0] * r[0] + r[1] * r[1] + r[2] * r[2];
 
@@ -124,11 +124,14 @@ impl AtomicPotentialTrait for LJCut {
 
         forces
     }
+    fn num_types(&self) -> usize {
+        self.num_types.clone()
+    }
     fn set_num_types(&mut self, num_types: usize) -> Result<(), Error> {
         if self.num_types == num_types {
             return Ok(());
         }
-        let new_len = (num_types * num_types) as usize;
+        let new_len = num_types * num_types;
         if self.num_types == 0 {
             self.num_types = num_types;
             self.coeff_set.resize(new_len, false);
@@ -145,8 +148,8 @@ impl AtomicPotentialTrait for LJCut {
                 if !set {
                     return None;
                 }
-                let i = n / self.num_types as usize;
-                let j = n % self.num_types as usize;
+                let i = n / self.num_types;
+                let j = n % self.num_types;
                 if i >= num_types || j >= num_types {
                     return None;
                 }

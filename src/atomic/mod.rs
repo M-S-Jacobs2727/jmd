@@ -25,4 +25,10 @@ pub trait AtomicPotentialTrait {
 
     /// Increase or decrease the number of atom types
     fn set_num_types(&mut self, num_types: usize) -> Result<(), Error>;
+
+    fn num_types(&self) -> usize;
+
+    fn type_idx(&self, typei: u32, typej: u32) -> usize {
+        self.num_types() * typei as usize + typej as usize
+    }
 }
