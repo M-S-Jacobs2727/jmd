@@ -1,8 +1,8 @@
 // TODO: add num_types to new method
-pub mod ljcut;
-pub mod none;
+mod ljcut;
+mod none;
 
-pub use ljcut::{LJCut, LJCutCoeff};
+pub use ljcut::LJCut;
 
 use enum_dispatch::enum_dispatch;
 
@@ -24,5 +24,5 @@ pub trait AtomicPotentialTrait {
     fn compute_forces(&self, atoms: &Atoms) -> Vec<[f64; 3]>;
 
     /// Increase or decrease the number of atom types
-    fn set_num_types(&mut self, num_types: u32) -> Result<(), Error>;
+    fn set_num_types(&mut self, num_types: usize) -> Result<(), Error>;
 }

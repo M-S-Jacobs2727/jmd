@@ -85,7 +85,7 @@ impl Domain {
             my_sender,
             procs: neighbor_procs,
             thread_ids: Vec::new(),
-            subdomain: Rect::new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0),
+            subdomain: Rect::new(0.0, 10.0, 0.0, 10.0, 0.0, 10.0),
             proc_dimensions: [0, 0, 0],
             my_idx: [0, 0, 0],
         }

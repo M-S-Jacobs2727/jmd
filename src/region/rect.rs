@@ -14,6 +14,16 @@ pub struct Rect {
 }
 impl Rect {
     pub fn new(xlo: f64, xhi: f64, ylo: f64, yhi: f64, zlo: f64, zhi: f64) -> Self {
+        assert!(
+            xlo < xhi && ylo < yhi && zlo < zhi,
+            "Low corner ({}, {}, {}) should be less than high corner ({}, {}, {})",
+            xlo,
+            ylo,
+            zlo,
+            xhi,
+            yhi,
+            zhi
+        );
         Self {
             xlo,
             xhi,

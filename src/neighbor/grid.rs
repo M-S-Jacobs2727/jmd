@@ -8,10 +8,18 @@ pub struct Grid {
 }
 impl Grid {
     pub fn new(container: &Container, bin_size: f64, cutoff_distance: f64) -> Self {
-        assert!(bin_size > 0.0, "Bin size must be positive");
         assert!(
-            bin_size < 0.5 * (container.lx().min(container.ly()).min(container.lz())),
-            "Bin size must be less than half the smallest box length"
+            bin_size > 0.0,
+            "Bin size should be positive, found {}",
+            bin_size
+        );
+        let min_box_length = container.lx().min(container.ly()).min(container.lz());
+        assert!(
+            bin_size < 0.5 * min_box_length,
+            "Bin size must be less than half the smallest box length, \
+             found bin_size {} and smallest box length {}",
+            bin_size,
+            min_box_length
         );
         let lo_corner = [
             container.xlo() - cutoff_distance,
@@ -56,7 +64,9 @@ impl Grid {
     pub fn bin_idx_to_3d_idx(&self, bin_idx: usize) -> [i32; 3] {
         assert!(
             bin_idx < self.total_num_bins(),
-            "Bin index should be less than the total number of bins"
+            "Bin index ({}) should be less than the total number of bins ({})",
+            bin_idx,
+            self.total_num_bins()
         );
         [
             (bin_idx / (self.num_bins[1] * self.num_bins[2])) as i32,
@@ -67,7 +77,10 @@ impl Grid {
     pub fn bin_idx_from_3d_idx(&self, inds: &[i32; 3]) -> usize {
         assert!(
             inds[0] >= 0 && inds[1] >= 0 && inds[2] >= 0,
-            "3D bin indices should be positive"
+            "3D bin indices ({}, {}, {}) should be positive",
+            inds[0],
+            inds[1],
+            inds[2]
         );
         (inds[0] as usize) * self.num_bins[1] * self.num_bins[2]
             + (inds[1] as usize) * self.num_bins[2]

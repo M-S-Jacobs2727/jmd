@@ -16,20 +16,20 @@ pub struct Simulation {
 }
 
 impl Simulation {
-    pub fn new(atom_types: u32) -> Self {
+    pub fn new() -> Self {
         let container = Container::new(0., 10., 0.0, 10.0, 0.0, 10.0, BC::PP, BC::PP, BC::PP);
         let neighbor_list = NeighborList::new(&container, 1.0, 1.0, 1.0);
         Self {
             atoms: Atoms::new(),
             container,
-            atomic_potential: LJCut::new(atom_types).into(),
+            atomic_potential: LJCut::new().into(),
             neighbor_list,
             domain: Domain::new(),
             nlocal: 0,
             max_distance_sq: 0.0,
         }
     }
-    pub fn set_atom_types(&mut self, atom_types: u32) -> Result<(), Error> {
+    pub fn set_atom_types(&mut self, atom_types: usize) -> Result<(), Error> {
         self.atomic_potential.set_num_types(atom_types)
     }
     pub fn container(&self) -> &Container {

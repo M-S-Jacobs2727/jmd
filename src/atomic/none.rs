@@ -17,7 +17,7 @@ impl AtomicPotentialTrait for None_ {
         forces.resize(natoms, [0.0, 0.0, 0.0]);
         forces
     }
-    fn set_num_types(&mut self, _num_types: u32) -> Result<(), crate::Error> {
+    fn set_num_types(&mut self, _num_types: usize) -> Result<(), crate::Error> {
         Ok(())
     }
 }

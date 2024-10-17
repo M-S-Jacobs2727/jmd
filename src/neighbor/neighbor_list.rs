@@ -66,15 +66,17 @@ impl NeighborList {
         let neighbors: Vec<Vec<usize>> = Vec::new();
         assert!(
             force_distance > 0.0,
-            "Force cutoff distance must be positive"
+            "Force cutoff distance ({}) must be positive",
+            force_distance
         );
         assert!(
             skin_distance > 0.0,
-            "Neighbor skin distance must be positive"
+            "Neighbor skin distance ({}) must be positive",
+            skin_distance
         );
         let cutoff_distance = force_distance + skin_distance;
         let grid = Grid::new(container, bin_size, cutoff_distance);
-        let stencil = compute_stencil(grid.bin_size(), cutoff_distance);
+        let stencil = compute_stencil(bin_size, cutoff_distance);
         Self {
             grid,
             force_distance,
@@ -102,13 +104,9 @@ impl NeighborList {
     }
     pub fn update(&mut self, positions: &Vec<[f64; 3]>) {
         let num_atoms = positions.len();
-        assert!(
-            num_atoms == self.neighbors.len(),
-            "Number of atoms in positions vector and bin_numbers vector should be equal"
-        );
 
         self.neighbors.clear();
-        self.neighbors.resize(positions.len(), Vec::new());
+        self.neighbors.resize(num_atoms, Vec::new());
 
         let atom_indices_per_bin = bin_atoms(&self.grid, &positions);
         for (i, pos) in positions.iter().enumerate() {

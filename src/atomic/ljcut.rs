@@ -1,8 +1,8 @@
 use super::AtomicPotentialTrait;
 use crate::{utils::Types, Atoms, Error};
 
-#[derive(Clone, Copy)]
-pub struct LJCutCoeff {
+#[derive(Clone, Copy, Debug)]
+struct LJCutCoeff {
     sigma: f64,
     epsilon: f64,
     rcut: f64,
@@ -35,19 +35,21 @@ impl LJCutCoeff {
 
 /// Lennard-Jones 12-6 potential
 pub struct LJCut {
-    num_types: u32,
+    num_types: usize,
+    force_cutoff: f64,
     coeffs: Vec<LJCutCoeff>,
-    type_pairs: Vec<[u32; 2]>,
+    coeff_set: Vec<bool>,
 }
 impl LJCut {
-    pub fn new(num_types: u32) -> Self {
+    pub fn new() -> Self {
         Self {
-            num_types,
+            num_types: 0,
+            force_cutoff: 2.5,
             coeffs: Vec::new(),
-            type_pairs: Vec::new(),
+            coeff_set: Vec::new(),
         }
     }
-    pub fn add_coeff(
+    pub fn set_coeff(
         &mut self,
         type_i: Types,
         type_j: Types,
@@ -55,50 +57,43 @@ impl LJCut {
         epsilon: f64,
         rcut: f64,
     ) -> Result<(), Error> {
-        let itypes = type_i.to_range();
-        let mut jtypes = type_j.to_range();
-        let mut type_pairs: Vec<[u32; 2]> = Vec::new();
-        for i in itypes {
-            if i >= self.num_types {
-                return Err(Error::AtomicPotentialError);
-            }
-            for j in jtypes.by_ref() {
-                if self.type_pairs.contains(&[i, j])
-                    || self.type_pairs.contains(&[j, i])
-                    || j >= self.num_types
-                {
-                    return Err(Error::AtomicPotentialError);
-                }
-                type_pairs.push([i, j]);
+        let itypes = type_i.to_vec();
+        let jtypes = type_j.to_vec();
+        if itypes.iter().any(|&t| t >= self.num_types)
+            || jtypes.iter().any(|&t| t >= self.num_types)
+        {
+            return Err(Error::AtomicPotentialError);
+        }
+
+        let coeff = LJCutCoeff::new(sigma, epsilon, rcut);
+        for i in &itypes {
+            for j in &jtypes {
+                let index = (i * self.num_types + j) as usize;
+                self.coeff_set[index] = true;
+                self.coeffs[index] = coeff.clone();
             }
         }
 
-        self.type_pairs.append(&mut type_pairs);
-        self.coeffs.resize(
-            self.coeffs.len() + type_pairs.len(),
-            LJCutCoeff::new(sigma, epsilon, rcut),
-        );
         Ok(())
     }
-    fn type_index(&self, typei: u32, typej: u32) -> usize {
-        (typei * self.num_types + typej)
-            .try_into()
-            .expect("type_index function should convert to type usize")
+    pub fn all_set(&self) -> bool {
+        self.coeff_set.iter().all(|&x| x)
+    }
+    fn default_coeff(&self) -> LJCutCoeff {
+        LJCutCoeff::new(0.0, 0.0, 0.0)
     }
 }
 
 impl AtomicPotentialTrait for LJCut {
     fn cutoff_distance(&self) -> f64 {
-        self.coeffs
-            .iter()
-            .map(|c| c.rcut)
-            .reduce(f64::max)
-            .unwrap_or(0.0)
+        self.force_cutoff.clone()
     }
     fn compute_forces(&self, atoms: &Atoms) -> Vec<[f64; 3]> {
         let mut forces: Vec<[f64; 3]> = Vec::new();
         forces.resize(atoms.num_atoms(), [0.0, 0.0, 0.0]);
         for i in 0..atoms.num_atoms() - 1 {
+            let typei = &atoms.types[i];
+            let posi = &atoms.positions[i];
             for j in i + 1..atoms.num_atoms() {
                 // U(r) = 4 eps ((sig/r)^12 - (sig/r)^6) - const
                 // f(r) = dU/dr = dU/d(r^2) d(r^2)/dr
@@ -109,15 +104,10 @@ impl AtomicPotentialTrait for LJCut {
                 // f(r_ij) = r_ij * -24 eps / sig^2, so if r_ij = r_j - r_i = (sig, 0),
                 // then f_i = f(r_ij) and f_j = -f(r_ij)
 
-                let idx = self.type_index(atoms.types()[i], atoms.types()[j]);
-                let coeff = &self.coeffs[idx];
-                let pos_i = atoms.positions()[i];
-                let pos_j = atoms.positions()[j];
-                let r = [
-                    pos_i[0] - pos_j[0],
-                    pos_i[1] - pos_j[1],
-                    pos_i[2] - pos_j[2],
-                ];
+                let typej = &atoms.types[j];
+                let posj = &atoms.positions[j];
+                let coeff = self.coeffs[self.num_types * *typei as usize + *typej as usize];
+                let r = [posi[0] - posj[0], posi[1] - posj[1], posi[2] - posj[2]];
                 let r2 = r[0] * r[0] + r[1] * r[1] + r[2] * r[2];
 
                 if r2 > coeff.rcut2 {
@@ -134,23 +124,65 @@ impl AtomicPotentialTrait for LJCut {
 
         forces
     }
-    fn set_num_types(&mut self, num_types: u32) -> Result<(), Error> {
-        if self.type_pairs.is_empty() {
-            self.num_types = num_types;
+    fn set_num_types(&mut self, num_types: usize) -> Result<(), Error> {
+        if self.num_types == num_types {
             return Ok(());
         }
-        let max_type = self
-            .type_pairs
-            .iter()
-            .map(|[i, j]| *i.max(j))
-            .max()
-            .unwrap();
-
-        if max_type >= num_types {
-            Err(Error::AtomicPotentialError)
-        } else {
+        let new_len = (num_types * num_types) as usize;
+        if self.num_types == 0 {
             self.num_types = num_types;
-            Ok(())
+            self.coeff_set.resize(new_len, false);
+            self.coeffs.resize(new_len, self.default_coeff());
+            return Ok(());
         }
+
+        // Get currently set indices
+        let mut set_indices: Vec<[usize; 2]> = self
+            .coeff_set
+            .iter()
+            .enumerate()
+            .filter_map(|(n, set)| {
+                if !set {
+                    return None;
+                }
+                let i = n / self.num_types as usize;
+                let j = n % self.num_types as usize;
+                if i >= num_types || j >= num_types {
+                    return None;
+                }
+                Some([i, j])
+            })
+            .collect();
+        set_indices.sort_by(|a, b| {
+            if a[0] == b[0] {
+                a[1].cmp(&b[1])
+            } else {
+                a[0].cmp(&b[0])
+            }
+        });
+
+        if self.num_types < num_types {
+            // Adding more types: Resize first, then shift coeffs
+            self.coeffs.resize(new_len, self.default_coeff());
+            self.coeff_set.resize(new_len, false);
+            for [i, j] in set_indices.iter().rev() {
+                let old_idx = i * self.num_types + j;
+                let new_idx = i * num_types + j;
+                self.coeffs.swap(old_idx, new_idx);
+                self.coeff_set.swap(old_idx, new_idx);
+            }
+        } else {
+            // Removing types: shift coeffs first, then resize
+            for [i, j] in set_indices.iter().rev() {
+                let old_idx = i * self.num_types + j;
+                let new_idx = i * num_types + j;
+                self.coeffs.swap(old_idx, new_idx);
+                self.coeff_set.swap(old_idx, new_idx);
+            }
+            self.coeffs.resize(new_len, self.default_coeff());
+            self.coeff_set.resize(new_len, false);
+        }
+
+        Ok(())
     }
 }

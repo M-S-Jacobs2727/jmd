@@ -58,19 +58,19 @@ impl Container {
         }
     }
     pub fn is_periodic(&self, direction: Direction) -> bool {
-        self.bc[direction.index()].is_periodic()
+        self.bc[direction.axis().index()].is_periodic()
     }
     pub fn rect(&self) -> &Rect {
         &self.rect
     }
     pub fn lx(&self) -> f64 {
-        self.xlo() - self.xhi()
+        self.rect.lx()
     }
     pub fn ly(&self) -> f64 {
-        self.ylo() - self.yhi()
+        self.rect.ly()
     }
     pub fn lz(&self) -> f64 {
-        self.zlo() - self.zhi()
+        self.rect.lz()
     }
     pub fn lengths(&self) -> [f64; 3] {
         [self.lx(), self.ly(), self.lz()]
