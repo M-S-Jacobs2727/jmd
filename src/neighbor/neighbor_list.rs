@@ -43,25 +43,6 @@ fn compute_stencil(bin_size: f64, cutoff_distance: f64) -> Vec<[i32; 3]> {
     stencil
 }
 
-fn bin_atoms(grid: &Grid, positions: &Vec<[f64; 3]>) -> Vec<Vec<usize>> {
-    let mut atom_indices_per_bin: Vec<Vec<usize>> = Vec::new();
-    atom_indices_per_bin.resize(grid.total_num_bins(), Vec::new());
-    positions
-        .iter()
-        .map(|p| {
-            // dbg!(p);
-            grid.coord_to_3d_idx(p)
-        })
-        .enumerate()
-        .for_each(|(atom_idx, bin_idx)| {
-            // dbg!(bin_idx);
-            let lin_idx = grid.bin_idx_from_3d_idx(&bin_idx);
-            // dbg!(lin_idx);
-            atom_indices_per_bin[lin_idx].push(atom_idx)
-        });
-    atom_indices_per_bin
-}
-
 impl NeighborList {
     pub fn new(
         container: &Container,
@@ -117,7 +98,7 @@ impl NeighborList {
         let neigh_dist_sq = self.neighbor_distance * self.neighbor_distance;
 
         // dbg!(positions);
-        let atom_indices_per_bin = bin_atoms(&self.grid, &positions);
+        let atom_indices_per_bin = self.bin_atoms(&positions);
         for (i, pos) in positions.iter().enumerate() {
             let bin_idx = self.grid.coord_to_3d_idx(pos);
             // dbg!(&bin_idx);
@@ -135,5 +116,23 @@ impl NeighborList {
                 }
             }
         }
+    }
+    fn bin_atoms(&self, positions: &Vec<[f64; 3]>) -> Vec<Vec<usize>> {
+        let mut atom_indices_per_bin: Vec<Vec<usize>> = Vec::new();
+        atom_indices_per_bin.resize(self.grid.total_num_bins(), Vec::new());
+        positions
+            .iter()
+            .map(|p| {
+                // dbg!(p);
+                self.grid.coord_to_3d_idx(p)
+            })
+            .enumerate()
+            .for_each(|(atom_idx, bin_idx)| {
+                // dbg!(bin_idx);
+                let lin_idx = self.grid.bin_idx_from_3d_idx(&bin_idx);
+                // dbg!(lin_idx);
+                atom_indices_per_bin[lin_idx].push(atom_idx)
+            });
+        atom_indices_per_bin
     }
 }
