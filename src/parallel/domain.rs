@@ -5,8 +5,9 @@ use std::{
 };
 
 use super::{
+    message::Message,
     worker::{Worker, M2W, W2M},
-    AdjacentProcs, AtomInfo,
+    AdjacentProcs,
 };
 use crate::{region::Rect, utils::Direction, Container, NeighborList};
 
@@ -67,8 +68,8 @@ fn procs_in_box(nprocs: usize, lx: f64, ly: f64, lz: f64) -> [usize; 3] {
 
 /// Represents a process in relation to the other neighboring processes
 pub struct Domain {
-    receiver: mpsc::Receiver<AtomInfo>,
-    my_sender: mpsc::Sender<AtomInfo>,
+    receiver: mpsc::Receiver<Message>,
+    my_sender: mpsc::Sender<Message>,
     procs: AdjacentProcs,
     thread_ids: Vec<ThreadId>,
     subdomain: Rect,
@@ -112,6 +113,9 @@ impl Domain {
         self.setup_neighbor(worker, Direction::Yhi, container);
         self.setup_neighbor(worker, Direction::Zlo, container);
         self.setup_neighbor(worker, Direction::Zhi, container);
+    }
+    pub fn subdomain(&self) -> &Rect {
+        &self.subdomain
     }
     fn setup_neighbor(&mut self, worker: &Worker, direction: Direction, container: &Container) {
         // Get index of neighbor (3d then 1d), if neighbor is present, send Option<mpsc::Sender> to main with proc idx, otherwise None and 0
@@ -267,16 +271,16 @@ impl Domain {
         }
     }
 
-    pub fn clone_sender(&self) -> mpsc::Sender<AtomInfo> {
+    pub fn clone_sender(&self) -> mpsc::Sender<Message> {
         self.my_sender.clone()
     }
-    pub fn receiver(&self) -> &mpsc::Receiver<AtomInfo> {
+    pub fn receiver(&self) -> &mpsc::Receiver<Message> {
         &self.receiver
     }
     pub fn neighbor_procs(&self) -> &AdjacentProcs {
         &self.procs
     }
-    pub fn set_neighbor_proc(&mut self, direction: Direction, sender: mpsc::Sender<AtomInfo>) {
+    pub fn set_neighbor_proc(&mut self, direction: Direction, sender: mpsc::Sender<Message>) {
         self.procs.set(direction, sender);
     }
     pub fn set_thread_ids(&mut self, thread_ids: Vec<ThreadId>) {
@@ -292,20 +296,14 @@ impl Domain {
             .filter(|&&p| (*p).is_some())
             .count()
     }
-    pub fn receive(&self) -> Result<Option<AtomInfo>, mpsc::RecvError> {
-        match self.receiver.try_recv() {
-            Ok(t) => Ok(Some(t)),
-            Err(e) => match e {
-                mpsc::TryRecvError::Empty => Ok(None),
-                mpsc::TryRecvError::Disconnected => Err(mpsc::RecvError),
-            },
-        }
+    pub fn receive(&self) -> Result<Message, mpsc::RecvError> {
+        self.receiver.recv()
     }
     pub fn send(
         &self,
-        value: AtomInfo,
+        value: Message,
         neighbor: Direction,
-    ) -> Result<(), mpsc::SendError<AtomInfo>> {
+    ) -> Result<(), mpsc::SendError<Message>> {
         let n = match neighbor {
             Direction::Xlo => self.procs.xlo(),
             Direction::Xhi => self.procs.xhi(),

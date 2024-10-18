@@ -1,6 +1,7 @@
 use crate::Container;
 
 /// Neighbor list grid of bins
+#[derive(Debug)]
 pub struct Grid {
     lo_corner: [f64; 3],
     bin_size: f64,
@@ -26,16 +27,11 @@ impl Grid {
             container.ylo() - cutoff_distance,
             container.zlo() - cutoff_distance,
         ];
-        let hi_corner = [
-            container.xhi() + cutoff_distance,
-            container.yhi() + cutoff_distance,
-            container.zhi() + cutoff_distance,
+        let num_bins: [usize; 3] = [
+            ((container.lx() + 2.0 * cutoff_distance) / bin_size).ceil() as usize,
+            ((container.ly() + 2.0 * cutoff_distance) / bin_size).ceil() as usize,
+            ((container.lz() + 2.0 * cutoff_distance) / bin_size).ceil() as usize,
         ];
-        let mut num_bins: [usize; 3] = [0, 0, 0];
-        for i in 0..3 {
-            num_bins[i] += (hi_corner[i].max(0.0) / bin_size) as usize;
-            num_bins[i] += (-lo_corner[i].min(0.0) / bin_size) as usize;
-        }
         Self {
             lo_corner,
             bin_size,

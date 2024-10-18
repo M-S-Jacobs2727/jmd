@@ -70,6 +70,12 @@ impl Rect {
     pub fn lz(&self) -> f64 {
         self.zhi - self.zlo
     }
+    pub fn lo(&self) -> [f64; 3] {
+        [self.xlo, self.ylo, self.zlo]
+    }
+    pub fn hi(&self) -> [f64; 3] {
+        [self.xhi, self.yhi, self.zhi]
+    }
 }
 impl RegionTrait for Rect {
     fn contains(&self, coord: &[f64; 3]) -> bool {

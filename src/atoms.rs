@@ -98,4 +98,67 @@ impl Atoms {
             self.positions.push(region.get_random_coord())
         }
     }
+
+    pub fn remove_idxs(&mut self, atom_idxs: Vec<usize>) {
+        self.ids = self
+            .ids
+            .iter()
+            .enumerate()
+            .filter_map(|(i, x)| {
+                if atom_idxs.contains(&i) {
+                    None
+                } else {
+                    Some(*x)
+                }
+            })
+            .collect();
+        self.types = self
+            .types
+            .iter()
+            .enumerate()
+            .filter_map(|(i, x)| {
+                if atom_idxs.contains(&i) {
+                    None
+                } else {
+                    Some(*x)
+                }
+            })
+            .collect();
+        self.masses = self
+            .masses
+            .iter()
+            .enumerate()
+            .filter_map(|(i, x)| {
+                if atom_idxs.contains(&i) {
+                    None
+                } else {
+                    Some(*x)
+                }
+            })
+            .collect();
+        self.positions = self
+            .positions
+            .iter()
+            .enumerate()
+            .filter_map(|(i, x)| {
+                if atom_idxs.contains(&i) {
+                    None
+                } else {
+                    Some(*x)
+                }
+            })
+            .collect();
+        self.velocities = self
+            .velocities
+            .iter()
+            .enumerate()
+            .filter_map(|(i, x)| {
+                if atom_idxs.contains(&i) {
+                    None
+                } else {
+                    Some(*x)
+                }
+            })
+            .collect();
+    }
 }

@@ -48,10 +48,16 @@ fn bin_atoms(grid: &Grid, positions: &Vec<[f64; 3]>) -> Vec<Vec<usize>> {
     atom_indices_per_bin.resize(grid.total_num_bins(), Vec::new());
     positions
         .iter()
-        .map(|p| grid.coord_to_3d_idx(p))
+        .map(|p| {
+            // dbg!(p);
+            grid.coord_to_3d_idx(p)
+        })
         .enumerate()
         .for_each(|(atom_idx, bin_idx)| {
-            atom_indices_per_bin[grid.bin_idx_from_3d_idx(&bin_idx)].push(atom_idx)
+            // dbg!(bin_idx);
+            let lin_idx = grid.bin_idx_from_3d_idx(&bin_idx);
+            // dbg!(lin_idx);
+            atom_indices_per_bin[lin_idx].push(atom_idx)
         });
     atom_indices_per_bin
 }
@@ -77,6 +83,7 @@ impl NeighborList {
         let cutoff_distance = force_distance + skin_distance;
         let grid = Grid::new(container, bin_size, cutoff_distance);
         let stencil = compute_stencil(bin_size, cutoff_distance);
+        dbg!(&grid);
         Self {
             grid,
             force_distance,
@@ -107,10 +114,13 @@ impl NeighborList {
 
         self.neighbors.clear();
         self.neighbors.resize(num_atoms, Vec::new());
+        let neigh_dist_sq = self.neighbor_distance * self.neighbor_distance;
 
+        // dbg!(positions);
         let atom_indices_per_bin = bin_atoms(&self.grid, &positions);
         for (i, pos) in positions.iter().enumerate() {
             let bin_idx = self.grid.coord_to_3d_idx(pos);
+            // dbg!(&bin_idx);
             for offset in &self.stencil {
                 let comp_bin = [
                     offset[0] + bin_idx[0],
@@ -119,9 +129,7 @@ impl NeighborList {
                 ];
                 let comp_bin_linear = self.grid.bin_idx_from_3d_idx(&comp_bin);
                 for &neigh_idx in &atom_indices_per_bin[comp_bin_linear] {
-                    if distance_squared(&positions[neigh_idx], pos)
-                        < self.neighbor_distance() * self.neighbor_distance()
-                    {
+                    if distance_squared(&positions[neigh_idx], pos) < neigh_dist_sq {
                         self.neighbors[i].push(neigh_idx);
                     }
                 }

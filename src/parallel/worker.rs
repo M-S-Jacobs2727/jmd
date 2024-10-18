@@ -3,7 +3,7 @@ use std::{
     thread::{self, ThreadId},
 };
 
-use crate::{parallel::AtomInfo, Atoms, Container, Error, Simulation};
+use crate::{parallel::message::Message, Atoms, Container, Error, Simulation};
 
 /// Worker-to-Manager messages
 pub enum W2M {
@@ -12,7 +12,7 @@ pub enum W2M {
     Output(String),
     Dump(Atoms, Container),
     Id(thread::ThreadId),
-    Sender(Option<mpsc::Sender<AtomInfo>>, usize),
+    Sender(Option<mpsc::Sender<Message>>, usize),
     ProcDims([usize; 3]),
 }
 /// Manager-to-Worker messages
@@ -20,7 +20,7 @@ pub enum M2W {
     Error(Error),
     Setup(Vec<thread::ThreadId>),
     Run(fn(&mut Simulation) -> ()),
-    Sender(Option<mpsc::Sender<AtomInfo>>),
+    Sender(Option<mpsc::Sender<Message>>),
     ProcDims([usize; 3]),
 }
 /// Channels for communication between each process and the manager
@@ -54,11 +54,12 @@ impl Worker {
             M2W::Run(f) => {
                 let mut sim = Simulation::new();
                 sim.init(self);
-                f(&mut sim)
+                f(&mut sim);
             }
             M2W::Error(_) => return,
             _ => panic!("Invalid communication"),
         };
+        self.tx.send(W2M::Complete).unwrap();
     }
     pub fn thread_ids(&self) -> &Vec<ThreadId> {
         &self.thread_ids

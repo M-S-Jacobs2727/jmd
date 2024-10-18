@@ -5,7 +5,7 @@ fn run(simulation: &mut jmd::Simulation) {
     simulation.set_container(container);
 
     simulation.atoms.add_random_atoms(&rect.into(), 10, 0, 1.0);
-
+    dbg!(&simulation.atoms.positions);
     let mut lj = jmd::LJCut::new(1, 2.5);
     lj.set_coeff(0.into(), 0.into(), 1.0, 1.0, 2.5).unwrap();
     simulation.set_atomic_potential(lj.into());
@@ -13,6 +13,8 @@ fn run(simulation: &mut jmd::Simulation) {
 
     let mut verlet = jmd::Verlet::new();
     verlet.timestep = 0.005;
+    println!("Start");
+
     verlet.run(simulation, 250);
 }
 

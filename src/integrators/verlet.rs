@@ -52,6 +52,7 @@ impl IntegratorTrait for Verlet {
         simulation.reverse_comm(&mut forces);
 
         for step in 0..num_steps {
+            dbg!("=====================================");
             self.increment_velocity_halfstep(simulation, &forces);
             self.increment_positions(simulation);
             simulation.forward_comm();
@@ -62,6 +63,8 @@ impl IntegratorTrait for Verlet {
             simulation.reverse_comm(&mut forces);
 
             self.increment_velocity_halfstep(simulation, &forces);
+
+            dbg!(&simulation.atoms.positions);
         }
     }
 }
