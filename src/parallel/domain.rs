@@ -72,7 +72,6 @@ pub struct Domain<'a> {
     my_sender: mpsc::Sender<Message>,
     worker: Option<Box<&'a Worker>>,
     procs: AdjacentProcs,
-    thread_ids: Vec<ThreadId>,
     subdomain: Rect,
     proc_dimensions: [usize; 3],
     my_idx: [usize; 3],
@@ -87,22 +86,20 @@ impl<'a> Domain<'a> {
             my_sender,
             worker: None,
             procs: neighbor_procs,
-            thread_ids: Vec::new(),
             subdomain: Rect::new(0.0, 10.0, 0.0, 10.0, 0.0, 10.0),
             proc_dimensions: [0, 0, 0],
             my_idx: [0, 0, 0],
         }
     }
     pub fn init(&mut self, container: &Container, worker: Box<&'a Worker>) {
-        self.thread_ids.clone_from(worker.thread_ids());
         self.worker = Some(worker);
 
-        let num_threads = self.thread_ids.len();
+        let num_threads = self.thread_ids().len();
         self.proc_dimensions =
             procs_in_box(num_threads, container.lx(), container.ly(), container.lz());
 
         self.my_idx = linear_to_multi(
-            self.thread_ids
+            self.thread_ids()
                 .iter()
                 .position(|&id| thread::current().id() == id)
                 .unwrap(),
@@ -141,7 +138,7 @@ impl<'a> Domain<'a> {
         };
     }
     pub fn initialized(&self) -> bool {
-        !self.thread_ids.is_empty()
+        self.worker.is_some()
     }
     pub fn reset_subdomain(&mut self, container: &Container) {
         let l = [
@@ -289,11 +286,8 @@ impl<'a> Domain<'a> {
     pub fn set_neighbor_proc(&mut self, direction: Direction, sender: mpsc::Sender<Message>) {
         self.procs.set(direction, sender);
     }
-    pub fn set_thread_ids(&mut self, thread_ids: Vec<ThreadId>) {
-        self.thread_ids = thread_ids;
-    }
     pub fn thread_ids(&self) -> &Vec<ThreadId> {
-        &self.thread_ids
+        self.worker().thread_ids()
     }
     pub fn num_neighbors(&self) -> usize {
         self.procs
