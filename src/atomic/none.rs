@@ -23,4 +23,7 @@ impl AtomicPotentialTrait for None_ {
     fn num_types(&self) -> usize {
         0
     }
+    fn compute_energy(&self, _atoms: &Atoms) -> f64 {
+        0.0
+    }
 }

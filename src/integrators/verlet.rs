@@ -28,9 +28,6 @@ impl Verlet {
     fn increment_positions(&self, simulation: &mut Simulation) {
         for i in 0..simulation.atoms.num_atoms() {
             let vel = simulation.atoms.velocities()[i];
-            simulation.update_max_distance_sq(
-                self.timestep * (vel[0] * vel[0] + vel[1] * vel[1] + vel[2] * vel[2]),
-            );
 
             simulation.atoms.increment_position(
                 i,

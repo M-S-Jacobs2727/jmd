@@ -8,11 +8,15 @@ struct LJCutCoeff {
     rcut: f64,
     sigma6: f64,
     rcut2: f64,
-    prefactor: f64, // = -24 epsilon * sigma^6
+    prefactor: f64,  // = -24 epsilon * sigma^6
+    correction: f64, // currently, only shift is supported
 }
 impl LJCutCoeff {
     pub fn new(sigma: f64, epsilon: f64, rcut: f64) -> Self {
         let sigma6 = sigma * sigma * sigma * sigma * sigma * sigma;
+        let rcut2 = rcut * rcut;
+        let rcut6 = rcut2 * rcut2 * rcut2;
+        let correction = 2.0 * epsilon * sigma6 / rcut6 * (sigma6 / rcut6 - 1.0);
         Self {
             sigma,
             epsilon,
@@ -20,6 +24,7 @@ impl LJCutCoeff {
             rcut2: rcut * rcut,
             sigma6,
             prefactor: -24.0 * epsilon * sigma6,
+            correction,
         }
     }
     pub fn sigma(&self) -> f64 {
@@ -93,13 +98,18 @@ impl AtomicPotentialTrait for LJCut {
     fn cutoff_distance(&self) -> f64 {
         self.force_cutoff.clone()
     }
+    // TODO: check that forces are not double counted (newton-pair half, not full)
     fn compute_forces(&self, atoms: &Atoms) -> Vec<[f64; 3]> {
         let mut forces: Vec<[f64; 3]> = Vec::new();
         forces.resize(atoms.num_atoms(), [0.0, 0.0, 0.0]);
-        for i in 0..atoms.num_atoms() - 1 {
+        for i in 0..atoms.nlocal {
             let typei = &atoms.types[i];
             let posi = &atoms.positions[i];
-            for j in i + 1..atoms.num_atoms() {
+
+            for j in 0..atoms.num_atoms() {
+                if i == j {
+                    continue;
+                }
                 // U(r) = 4 eps ((sig/r)^12 - (sig/r)^6) - const
                 // f(r) = dU/dr = dU/d(r^2) d(r^2)/dr
                 // f(r) = -24 r eps / r^2 (2(sig/r)^12 - (sig/r)^6)
@@ -111,6 +121,7 @@ impl AtomicPotentialTrait for LJCut {
 
                 let typej = &atoms.types[j];
                 let posj = &atoms.positions[j];
+
                 let coeff = self.coeffs[self.type_idx(*typei, *typej)];
                 let r = [posi[0] - posj[0], posi[1] - posj[1], posi[2] - posj[2]];
                 let r2 = r[0] * r[0] + r[1] * r[1] + r[2] * r[2];
@@ -123,11 +134,49 @@ impl AtomicPotentialTrait for LJCut {
 
                 let f_mag = coeff.prefactor / r6 / r2 * (2.0 * coeff.sigma6 / r6 - 1.0);
                 forces[i] = [r[0] * f_mag, r[1] * f_mag, r[2] * f_mag];
-                forces[j] = [-forces[i][0], -forces[i][1], -forces[i][2]];
             }
         }
 
         forces
+    }
+    fn compute_energy(&self, atoms: &Atoms) -> f64 {
+        let mut energy = 0.0;
+
+        for i in 0..atoms.nlocal {
+            let typei = &atoms.types[i];
+            let posi = &atoms.positions[i];
+
+            for j in 0..atoms.num_atoms() {
+                if i == j {
+                    continue;
+                }
+                // U(r) = 4 eps ((sig/r)^12 - (sig/r)^6) - const
+                // f(r) = dU/dr = dU/d(r^2) d(r^2)/dr
+                // f(r) = -24 r eps / r^2 (2(sig/r)^12 - (sig/r)^6)
+
+                // If r_i = (0, 0) and r_j = (sig, 0), then the
+                // force should be repulsive, ie., f_i ~ (-1, 0), f_j ~ (1, 0)
+                // f(r_ij) = r_ij * -24 eps / sig^2, so if r_ij = r_j - r_i = (sig, 0),
+                // then f_i = f(r_ij) and f_j = -f(r_ij)
+
+                let typej = &atoms.types[j];
+                let posj = &atoms.positions[j];
+
+                let coeff = self.coeffs[self.type_idx(*typei, *typej)];
+                let r = [posi[0] - posj[0], posi[1] - posj[1], posi[2] - posj[2]];
+                let r2 = r[0] * r[0] + r[1] * r[1] + r[2] * r[2];
+
+                if r2 > coeff.rcut2 {
+                    continue;
+                }
+
+                let r6 = r2 * r2 * r2;
+
+                energy += 2.0 * coeff.epsilon * coeff.sigma6 / r6 * (coeff.sigma6 / r6 - 1.0)
+                    - coeff.correction;
+            }
+        }
+        energy
     }
     fn num_types(&self) -> usize {
         self.num_types.clone()

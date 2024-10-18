@@ -12,8 +12,8 @@ impl Axis {
             Axis::Z => 2,
         }
     }
-    pub fn direction(&self, lo: bool) -> Direction {
-        match (self, lo) {
+    pub fn direction(&self, hi: bool) -> Direction {
+        match (self, hi) {
             (Axis::X, false) => Direction::Xlo,
             (Axis::X, true) => Direction::Xhi,
             (Axis::Y, false) => Direction::Ylo,
@@ -64,6 +64,12 @@ impl Direction {
         match self {
             Direction::Xlo | Direction::Ylo | Direction::Zlo => true,
             _ => false,
+        }
+    }
+    pub fn is_hi(&self) -> bool {
+        match self {
+            Direction::Xlo | Direction::Ylo | Direction::Zlo => false,
+            _ => true,
         }
     }
 }

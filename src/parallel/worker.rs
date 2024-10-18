@@ -49,17 +49,7 @@ impl Worker {
             panic!("Invalid communication")
         };
 
-        let msg = self.rx.recv().unwrap();
-        match msg {
-            M2W::Run(f) => {
-                let mut sim = Simulation::new();
-                sim.init(self);
-                f(&mut sim);
-            }
-            M2W::Error(_) => return,
-            _ => panic!("Invalid communication"),
-        };
-        self.tx.send(W2M::Complete).unwrap();
+        self.run()
     }
     pub fn thread_ids(&self) -> &Vec<ThreadId> {
         &self.thread_ids
@@ -73,8 +63,22 @@ impl Worker {
     pub fn try_recv(&self) -> Result<M2W, mpsc::TryRecvError> {
         self.rx.try_recv()
     }
-
     pub fn error(&self, e: Error) {
         self.send(W2M::Error(e)).unwrap();
+    }
+
+    fn run(&self) {
+        let msg = self.rx.recv().unwrap();
+        match msg {
+            M2W::Run(f) => {
+                let mut sim = Simulation::new();
+                let b = Box::new(self);
+                sim.init(b);
+                f(&mut sim);
+            }
+            M2W::Error(_) => return,
+            _ => panic!("Invalid communication"),
+        };
+        self.tx.send(W2M::Complete).unwrap();
     }
 }

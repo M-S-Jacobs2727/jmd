@@ -67,16 +67,17 @@ fn procs_in_box(nprocs: usize, lx: f64, ly: f64, lz: f64) -> [usize; 3] {
 }
 
 /// Represents a process in relation to the other neighboring processes
-pub struct Domain {
+pub struct Domain<'a> {
     receiver: mpsc::Receiver<Message>,
     my_sender: mpsc::Sender<Message>,
+    worker: Option<Box<&'a Worker>>,
     procs: AdjacentProcs,
     thread_ids: Vec<ThreadId>,
     subdomain: Rect,
     proc_dimensions: [usize; 3],
     my_idx: [usize; 3],
 }
-impl Domain {
+impl<'a> Domain<'a> {
     pub fn new() -> Self {
         let neighbor_procs: AdjacentProcs = AdjacentProcs::new();
         let (my_sender, receiver) = mpsc::channel();
@@ -84,6 +85,7 @@ impl Domain {
         Self {
             receiver,
             my_sender,
+            worker: None,
             procs: neighbor_procs,
             thread_ids: Vec::new(),
             subdomain: Rect::new(0.0, 10.0, 0.0, 10.0, 0.0, 10.0),
@@ -91,8 +93,9 @@ impl Domain {
             my_idx: [0, 0, 0],
         }
     }
-    pub fn init(&mut self, container: &Container, worker: &Worker) {
+    pub fn init(&mut self, container: &Container, worker: Box<&'a Worker>) {
         self.thread_ids.clone_from(worker.thread_ids());
+        self.worker = Some(worker);
 
         let num_threads = self.thread_ids.len();
         self.proc_dimensions =
@@ -107,17 +110,20 @@ impl Domain {
         );
         self.reset_subdomain(container);
 
-        self.setup_neighbor(worker, Direction::Xlo, container);
-        self.setup_neighbor(worker, Direction::Xhi, container);
-        self.setup_neighbor(worker, Direction::Ylo, container);
-        self.setup_neighbor(worker, Direction::Yhi, container);
-        self.setup_neighbor(worker, Direction::Zlo, container);
-        self.setup_neighbor(worker, Direction::Zhi, container);
+        self.setup_neighbor(Direction::Xlo, container);
+        self.setup_neighbor(Direction::Xhi, container);
+        self.setup_neighbor(Direction::Ylo, container);
+        self.setup_neighbor(Direction::Yhi, container);
+        self.setup_neighbor(Direction::Zlo, container);
+        self.setup_neighbor(Direction::Zhi, container);
     }
     pub fn subdomain(&self) -> &Rect {
         &self.subdomain
     }
-    fn setup_neighbor(&mut self, worker: &Worker, direction: Direction, container: &Container) {
+    fn worker(&self) -> &Box<&'a Worker> {
+        self.worker.as_ref().expect("Must init")
+    }
+    fn setup_neighbor(&mut self, direction: Direction, container: &Container) {
         // Get index of neighbor (3d then 1d), if neighbor is present, send Option<mpsc::Sender> to main with proc idx, otherwise None and 0
         // Receive from main Option<mpsc::Sender> for opposite neighbor
         let idx = self.get_1d_neighbor(&self.my_idx, direction.clone(), container);
@@ -125,8 +131,8 @@ impl Domain {
             Some(i) => (Some(self.my_sender.clone()), i),
             None => (None, 0),
         };
-        worker.send(W2M::Sender(msg.0, msg.1)).unwrap();
-        let msg = worker.recv();
+        self.worker().send(W2M::Sender(msg.0, msg.1)).unwrap();
+        let msg = self.worker().recv();
         match msg {
             Ok(M2W::Sender(Some(sender))) => self.procs.set(direction.opposite(), sender),
             Ok(M2W::Sender(None)) => {}

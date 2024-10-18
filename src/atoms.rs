@@ -11,6 +11,7 @@ pub struct Atoms {
     pub positions: Vec<[f64; 3]>,
     pub velocities: Vec<[f64; 3]>,
     pub masses: Vec<f64>,
+    pub nlocal: usize,
 }
 impl Atoms {
     pub fn new() -> Self {
@@ -20,6 +21,7 @@ impl Atoms {
             positions: Vec::new(),
             velocities: Vec::new(),
             masses: Vec::new(),
+            nlocal: 0,
         }
     }
     pub fn num_atoms(&self) -> usize {
@@ -56,7 +58,6 @@ impl Atoms {
     pub fn set_velocity(&mut self, i: usize, new_vel: [f64; 3]) {
         self.velocities[i] = new_vel;
     }
-
     pub fn sort_atoms_by_bin(&mut self, bins: &neighbor::Grid) -> Vec<usize> {
         let bin_indices = self
             .positions
@@ -84,12 +85,16 @@ impl Atoms {
         atom_type: u32,
         mass: f64,
     ) {
-        let atom_id = self.ids().iter().max().unwrap_or(&0) + 1;
+        let atom_id = match self.ids().iter().max() {
+            Some(j) => j + 1,
+            None => 0,
+        };
         self.ids.extend(atom_id..atom_id + num_atoms);
         self.types.reserve(num_atoms);
         self.positions.reserve(num_atoms);
         self.velocities.reserve(num_atoms);
         self.masses.reserve(num_atoms);
+        self.nlocal += num_atoms;
 
         for _i in 0..num_atoms {
             self.types.push(atom_type);
@@ -98,67 +103,26 @@ impl Atoms {
             self.positions.push(region.get_random_coord())
         }
     }
-
     pub fn remove_idxs(&mut self, atom_idxs: Vec<usize>) {
-        self.ids = self
-            .ids
-            .iter()
-            .enumerate()
-            .filter_map(|(i, x)| {
-                if atom_idxs.contains(&i) {
-                    None
-                } else {
-                    Some(*x)
-                }
-            })
-            .collect();
-        self.types = self
-            .types
-            .iter()
-            .enumerate()
-            .filter_map(|(i, x)| {
-                if atom_idxs.contains(&i) {
-                    None
-                } else {
-                    Some(*x)
-                }
-            })
-            .collect();
-        self.masses = self
-            .masses
-            .iter()
-            .enumerate()
-            .filter_map(|(i, x)| {
-                if atom_idxs.contains(&i) {
-                    None
-                } else {
-                    Some(*x)
-                }
-            })
-            .collect();
-        self.positions = self
-            .positions
-            .iter()
-            .enumerate()
-            .filter_map(|(i, x)| {
-                if atom_idxs.contains(&i) {
-                    None
-                } else {
-                    Some(*x)
-                }
-            })
-            .collect();
-        self.velocities = self
-            .velocities
-            .iter()
-            .enumerate()
-            .filter_map(|(i, x)| {
-                if atom_idxs.contains(&i) {
-                    None
-                } else {
-                    Some(*x)
-                }
-            })
-            .collect();
+        let num_local = atom_idxs.iter().filter(|&i| *i < self.nlocal).count();
+        self.nlocal -= num_local;
+        fn filter_by_idx<T: Copy>(atom_idxs: &Vec<usize>, vec: &Vec<T>) -> Vec<T> {
+            vec.iter()
+                .enumerate()
+                .filter_map(|(i, x)| {
+                    if atom_idxs.contains(&i) {
+                        None
+                    } else {
+                        Some(*x)
+                    }
+                })
+                .collect()
+        }
+
+        self.ids = filter_by_idx(&atom_idxs, &self.ids);
+        self.types = filter_by_idx(&atom_idxs, &self.types);
+        self.masses = filter_by_idx(&atom_idxs, &self.masses);
+        self.positions = filter_by_idx(&atom_idxs, &self.positions);
+        self.velocities = filter_by_idx(&atom_idxs, &self.velocities);
     }
 }

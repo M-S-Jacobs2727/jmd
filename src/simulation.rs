@@ -5,18 +5,17 @@ use crate::{
     UpdateSettings, BC,
 };
 
-pub struct Simulation {
+pub struct Simulation<'a> {
     pub atoms: Atoms,
-    pub container: Container,
-    pub atomic_potential: AtomicPotential,
-    pub neighbor_list: NeighborList,
-    domain: Domain,
+    container: Container,
+    atomic_potential: AtomicPotential,
+    neighbor_list: NeighborList,
+    domain: Domain<'a>,
     nlocal: usize,
-    max_distance_sq: f64,
     pos_at_prev_neigh_build: Vec<[f64; 3]>,
 }
 
-impl Simulation {
+impl<'a> Simulation<'a> {
     pub fn new() -> Self {
         let container = Container::new(0., 10., 0.0, 10.0, 0.0, 10.0, BC::PP, BC::PP, BC::PP);
         let neighbor_list = NeighborList::new(&container, 1.0, 1.0, 1.0);
@@ -27,13 +26,11 @@ impl Simulation {
             neighbor_list,
             domain: Domain::new(),
             nlocal: 0,
-            max_distance_sq: 0.0,
             pos_at_prev_neigh_build: Vec::new(),
         }
     }
-    pub fn set_atom_types(&mut self, atom_types: usize) -> Result<(), Error> {
-        self.atomic_potential.set_num_types(atom_types)
-    }
+
+    // Getters
     pub fn container(&self) -> &Container {
         &self.container
     }
@@ -49,8 +46,10 @@ impl Simulation {
     pub fn nlocal(&self) -> usize {
         self.nlocal
     }
-    pub fn max_distance_sq(&self) -> f64 {
-        self.max_distance_sq
+
+    // Setters
+    pub fn set_atom_types(&mut self, atom_types: usize) -> Result<(), Error> {
+        self.atomic_potential.set_num_types(atom_types)
     }
     pub fn set_container(&mut self, container: Container) {
         self.container = container;
@@ -67,14 +66,11 @@ impl Simulation {
     pub fn set_neighbor_list(&mut self, neighbor_list: NeighborList) {
         self.neighbor_list = neighbor_list;
     }
-    pub fn set_domain(&mut self, domain: Domain) {
+    pub fn set_domain(&mut self, domain: Domain<'a>) {
         self.domain = domain;
     }
     pub fn set_neighbor_settings(&mut self, neighbor_settings: UpdateSettings) {
         self.neighbor_list.update_settings = neighbor_settings;
-    }
-    pub fn init(&mut self, worker: &Worker) {
-        self.domain.init(&self.container, worker);
     }
 
     pub fn compute_forces(&self) -> Vec<[f64; 3]> {
@@ -101,6 +97,62 @@ impl Simulation {
         self.comm_atom_ownership();
         self.neighbor_list.update(self.atoms.positions());
         self.pos_at_prev_neigh_build = self.atoms.positions.clone();
+    }
+
+    pub fn reverse_comm(&self, forces: &mut Vec<[f64; 3]>) {
+        let mut sent_ids: Vec<usize> = Vec::new();
+
+        // z-direction
+        let mut ids = self.send_reverse_comm(forces, Direction::Zhi);
+        sent_ids.append(&mut ids);
+        self.recv_reverse_comm(forces);
+
+        let mut ids = self.send_reverse_comm(forces, Direction::Zlo);
+        sent_ids.append(&mut ids);
+        self.recv_reverse_comm(forces);
+
+        // y-direction
+        let mut ids = self.send_reverse_comm(forces, Direction::Yhi);
+        sent_ids.append(&mut ids);
+        self.recv_reverse_comm(forces);
+
+        let mut ids = self.send_reverse_comm(forces, Direction::Ylo);
+        sent_ids.append(&mut ids);
+        self.recv_reverse_comm(forces);
+
+        // x-direction
+        let mut ids = self.send_reverse_comm(forces, Direction::Xhi);
+        sent_ids.append(&mut ids);
+        self.recv_reverse_comm(forces);
+
+        let mut ids = self.send_reverse_comm(forces, Direction::Xlo);
+        sent_ids.append(&mut ids);
+        self.recv_reverse_comm(forces);
+    }
+
+    pub fn forward_comm(&mut self) {
+        // x-direction
+        self.send_forward_comm(Direction::Xlo);
+        self.recv_forward_comm();
+        self.send_forward_comm(Direction::Xhi);
+        self.recv_forward_comm();
+
+        // y-direction
+        self.send_forward_comm(Direction::Ylo);
+        self.recv_forward_comm();
+        self.send_forward_comm(Direction::Yhi);
+        self.recv_forward_comm();
+
+        // z-direction
+        self.send_forward_comm(Direction::Zlo);
+        self.recv_forward_comm();
+        self.send_forward_comm(Direction::Zhi);
+        self.recv_forward_comm();
+    }
+
+    /// Initializes the simulation from a worker thread
+    pub(crate) fn init(&mut self, worker: Box<&'a Worker>) {
+        self.domain.init(&self.container, worker);
     }
 
     fn wrap_pbs(&mut self) {
@@ -211,37 +263,6 @@ impl Simulation {
         }
     }
 
-    pub fn reverse_comm(&self, forces: &mut Vec<[f64; 3]>) {
-        let mut sent_ids: Vec<usize> = Vec::new();
-
-        // z-direction
-        let mut ids = self.send_reverse_comm(forces, Direction::Zhi);
-        sent_ids.append(&mut ids);
-        self.recv_reverse_comm(forces);
-
-        let mut ids = self.send_reverse_comm(forces, Direction::Zlo);
-        sent_ids.append(&mut ids);
-        self.recv_reverse_comm(forces);
-
-        // y-direction
-        let mut ids = self.send_reverse_comm(forces, Direction::Yhi);
-        sent_ids.append(&mut ids);
-        self.recv_reverse_comm(forces);
-
-        let mut ids = self.send_reverse_comm(forces, Direction::Ylo);
-        sent_ids.append(&mut ids);
-        self.recv_reverse_comm(forces);
-
-        // x-direction
-        let mut ids = self.send_reverse_comm(forces, Direction::Xhi);
-        sent_ids.append(&mut ids);
-        self.recv_reverse_comm(forces);
-
-        let mut ids = self.send_reverse_comm(forces, Direction::Xlo);
-        sent_ids.append(&mut ids);
-        self.recv_reverse_comm(forces);
-    }
-
     fn recv_forward_comm(&mut self) {
         let id_msg = self.domain.receive().expect("Disconnect error");
         let type_msg = self.domain.receive().expect("Disconnect error");
@@ -262,26 +283,6 @@ impl Simulation {
         };
     }
 
-    pub fn forward_comm(&mut self) {
-        // x-direction
-        self.send_forward_comm(Direction::Xlo);
-        self.recv_forward_comm();
-        self.send_forward_comm(Direction::Xhi);
-        self.recv_forward_comm();
-
-        // y-direction
-        self.send_forward_comm(Direction::Ylo);
-        self.recv_forward_comm();
-        self.send_forward_comm(Direction::Yhi);
-        self.recv_forward_comm();
-
-        // z-direction
-        self.send_forward_comm(Direction::Zlo);
-        self.recv_forward_comm();
-        self.send_forward_comm(Direction::Zhi);
-        self.recv_forward_comm();
-    }
-
     fn atoms_moved_too_far(&mut self) -> bool {
         if self.atoms.num_atoms() == 0 {
             return false;
@@ -299,9 +300,6 @@ impl Simulation {
             .unwrap();
 
         max_dist_sq > half_skin_dist * half_skin_dist
-    }
-    pub fn update_max_distance_sq(&mut self, dist_sq: f64) {
-        self.max_distance_sq = dist_sq.max(self.max_distance_sq);
     }
 
     fn gather_ghost_ids(&self, rect: Rect) -> Vec<usize> {
@@ -371,55 +369,46 @@ impl Simulation {
     fn send_forward_comm(&self, direction: Direction) {
         let idxs =
             self.gather_owned_idxs(self.domain.get_inner_rect(&direction, &self.neighbor_list));
+        fn gather<T: Copy>(idxs: &Vec<usize>, vec: &Vec<T>) -> Vec<T> {
+            idxs.iter().map(|i| vec[*i]).collect()
+        }
+        let send = |m| self.domain.send(m, direction).expect("Disconnect error");
 
-        let types: Vec<u32> = idxs.iter().map(|i| self.atoms.types[*i]).collect();
-        let masses: Vec<f64> = idxs.iter().map(|i| self.atoms.masses[*i]).collect();
-        let positions: Vec<[f64; 3]> = idxs.iter().map(|i| self.atoms.positions[*i]).collect();
-        let velocities: Vec<[f64; 3]> = idxs.iter().map(|i| self.atoms.velocities[*i]).collect();
+        let types: Vec<u32> = gather(&idxs, &self.atoms.types);
+        let masses: Vec<f64> = gather(&idxs, &self.atoms.masses);
+        let positions: Vec<[f64; 3]> = gather(&idxs, &self.atoms.positions);
+        let velocities: Vec<[f64; 3]> = gather(&idxs, &self.atoms.velocities);
 
-        self.domain
-            .send(Message::Idxs(idxs), direction)
-            .expect("Disconnect error");
-        self.domain
-            .send(Message::Types(types), direction)
-            .expect("Disconnect error");
-        self.domain
-            .send(Message::Float(masses), direction)
-            .expect("Disconnect error");
-        self.domain
-            .send(Message::Float3(positions), direction)
-            .expect("Disconnect error");
-        self.domain
-            .send(Message::Float3(velocities), direction)
-            .expect("Disconnect error");
+        send(Message::Idxs(idxs));
+        send(Message::Types(types));
+        send(Message::Float(masses));
+        send(Message::Float3(positions));
+        send(Message::Float3(velocities));
     }
 
     fn update_ghost_atoms(
         &mut self,
-        ids: Vec<usize>,
-        types: Vec<u32>,
-        masses: Vec<f64>,
-        positions: Vec<[f64; 3]>,
-        velocities: Vec<[f64; 3]>,
+        mut ids: Vec<usize>,
+        mut types: Vec<u32>,
+        mut masses: Vec<f64>,
+        mut positions: Vec<[f64; 3]>,
+        mut velocities: Vec<[f64; 3]>,
     ) {
-        let ncomm = ids.len();
-        for i in 0..ncomm {
-            let opt_j = self.atoms.ids.iter().position(|id| *id == ids[i]);
-            match opt_j {
-                Some(j) => {
-                    self.atoms.types[j] = types[i];
-                    self.atoms.masses[j] = masses[i];
-                    self.atoms.positions[j] = positions[i];
-                    self.atoms.velocities[j] = velocities[i];
-                }
-                None => {
-                    self.atoms.ids.push(ids[i]);
-                    self.atoms.types.push(types[i]);
-                    self.atoms.masses.push(masses[i]);
-                    self.atoms.positions.push(positions[i]);
-                    self.atoms.velocities.push(velocities[i]);
-                }
-            }
-        }
+        assert_eq!(ids.len(), types.len(), "Invalid communication");
+        assert_eq!(ids.len(), masses.len(), "Invalid communication");
+        assert_eq!(ids.len(), positions.len(), "Invalid communication");
+        assert_eq!(ids.len(), velocities.len(), "Invalid communication");
+
+        self.atoms.ids.resize(self.atoms.nlocal, 0);
+        self.atoms.types.resize(self.atoms.nlocal, 0);
+        self.atoms.masses.resize(self.atoms.nlocal, 0.0);
+        self.atoms.positions.resize(self.atoms.nlocal, [0.0; 3]);
+        self.atoms.velocities.resize(self.atoms.nlocal, [0.0; 3]);
+
+        self.atoms.ids.append(&mut ids);
+        self.atoms.types.append(&mut types);
+        self.atoms.masses.append(&mut masses);
+        self.atoms.positions.append(&mut positions);
+        self.atoms.velocities.append(&mut velocities);
     }
 }
