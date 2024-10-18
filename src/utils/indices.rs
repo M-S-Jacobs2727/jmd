@@ -1,49 +1,52 @@
-use crate::Error;
-
-/// Three-dimensional index, convertible to a one-dimensional index
-pub struct Index3D {
-    x: usize,
-    y: usize,
-    z: usize,
+#[derive(Clone, Copy, Debug)]
+pub struct Index {
+    idx: usize,
+    bounds: [usize; 3],
 }
-impl Index3D {
-    pub fn new(x: usize, y: usize, z: usize) -> Self {
-        Self { x, y, z }
-    }
-    pub fn from_arr(idx: [usize; 3]) -> Self {
+impl Index {
+    pub fn new() -> Self {
         Self {
-            x: idx[0],
-            y: idx[1],
-            z: idx[2],
+            idx: 0,
+            bounds: [0, 0, 0],
         }
     }
-    pub fn to_1d(&self, lengths: [usize; 3]) -> Result<Index1D, Error> {
-        if self.x < lengths[0] && self.y < lengths[1] && self.z < lengths[2] {
-            Ok(Index1D::new(
-                self.x * lengths[1] * lengths[2] + self.y * lengths[2] + self.z,
-            ))
-        } else {
-            Err(Error::OtherError)
+    pub fn from_3d(indices: &[usize; 3], bounds: &[usize; 3]) -> Self {
+        let [x, y, z] = *indices;
+        let [nx, ny, nz] = *bounds;
+        if x >= nx || y >= ny || z >= nz {
+            panic!("Out of bounds");
+        }
+        let idx = x * bounds[1] * bounds[2] + y * bounds[2] + z;
+        Self {
+            idx,
+            bounds: [nx, ny, nz],
         }
     }
-}
-/// One-dimensional index, convertible to a three-dimensional index
-pub struct Index1D {
-    i: usize,
-}
-impl Index1D {
-    pub fn new(i: usize) -> Self {
-        Self { i }
+    pub fn to_3d(&self) -> [usize; 3] {
+        let z = self.idx % self.bounds[2];
+        let q = self.idx / self.bounds[2];
+        let y = q % self.bounds[1];
+        let x = q / self.bounds[1];
+        [x, y, z]
     }
-    pub fn to_3d(&self, lengths: [usize; 3]) -> Result<Index3D, Error> {
-        if self.i < lengths[0] * lengths[1] * lengths[2] {
-            let z = self.i % lengths[2];
-            let r = self.i / lengths[2];
-            let y = r % lengths[1];
-            let x = r / lengths[1];
-            Ok(Index3D::new(x, y, z))
-        } else {
-            Err(Error::OtherError)
+    pub fn idx(&self) -> usize {
+        self.idx.clone()
+    }
+    pub fn bounds(&self) -> [usize; 3] {
+        self.bounds.clone()
+    }
+
+    pub(crate) fn set_bounds(&mut self, bounds: [usize; 3]) {
+        if self.idx >= bounds[0] * bounds[1] * bounds[2] {
+            panic!("Out of bounds");
         }
+        self.bounds = bounds;
+    }
+
+    pub(crate) fn set_idx(&mut self, idx: usize) {
+        if idx > self.bounds[0] * self.bounds[1] * self.bounds[2] {
+            panic!("Out of bounds");
+        }
+        self.idx = idx
     }
 }

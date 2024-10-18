@@ -1,8 +1,8 @@
 use crate::{
     parallel::{message::Message, Domain, Worker},
     region::{Rect, RegionTrait},
-    AtomicPotential, AtomicPotentialTrait, Atoms, Container, Direction, Error, NeighborList, None_,
-    UpdateSettings, BC,
+    AtomicPotential, AtomicPotentialTrait, Atoms, Axis, Container, Direction, Error, NeighborList,
+    None_, UpdateSettings, BC,
 };
 
 pub struct Simulation<'a> {
@@ -156,7 +156,7 @@ impl<'a> Simulation<'a> {
     }
 
     fn wrap_pbs(&mut self) {
-        if self.container.is_periodic(Direction::Xlo) {
+        if self.container.is_periodic(Axis::X) {
             self.atoms.positions.iter_mut().for_each(|p| {
                 if p[0] < self.container.xlo() {
                     p[0] += self.container.lx();
@@ -165,7 +165,7 @@ impl<'a> Simulation<'a> {
                 }
             });
         }
-        if self.container.is_periodic(Direction::Ylo) {
+        if self.container.is_periodic(Axis::Y) {
             self.atoms.positions.iter_mut().for_each(|p| {
                 if p[1] < self.container.ylo() {
                     p[1] += self.container.ly();
@@ -174,7 +174,7 @@ impl<'a> Simulation<'a> {
                 }
             });
         }
-        if self.container.is_periodic(Direction::Zlo) {
+        if self.container.is_periodic(Axis::Z) {
             self.atoms.positions.iter_mut().for_each(|p| {
                 if p[2] < self.container.zlo() {
                     p[2] += self.container.lz();

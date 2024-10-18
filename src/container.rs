@@ -1,4 +1,4 @@
-use crate::{region::Rect, Direction};
+use crate::{region::Rect, Axis};
 
 /// Boundary conditions for simulation box.
 ///
@@ -57,8 +57,8 @@ impl Container {
             bc: [BC::PP, BC::PP, BC::PP],
         }
     }
-    pub fn is_periodic(&self, direction: Direction) -> bool {
-        self.bc[direction.axis().index()].is_periodic()
+    pub fn is_periodic(&self, axis: Axis) -> bool {
+        self.bc[axis.index()].is_periodic()
     }
     pub fn rect(&self) -> &Rect {
         &self.rect

@@ -9,31 +9,11 @@ use super::{
     worker::{Worker, M2W, W2M},
     AdjacentProcs,
 };
-use crate::{region::Rect, utils::Direction, Container, NeighborList};
-
-/// Transform a linear index of a L*M*N vector to a 3D index of a LxMxN array
-fn multi_to_linear(idx: &[usize; 3], lengths: &[usize; 3]) -> usize {
-    let [x, y, z] = &idx;
-    let [nx, ny, nz] = &lengths;
-    assert!(
-        x < nx && y < ny && z < nz,
-        "Multidimensional indices should be smaller than respective lengths"
-    );
-    x * ny * nz + y * nz + z
-}
-/// Transform a 3D index of a LxMxN array to a linear index of a L*M*N vector
-fn linear_to_multi(idx: usize, lengths: &[usize; 3]) -> [usize; 3] {
-    let [nx, ny, nz] = &lengths;
-    assert!(
-        nx * ny * nz > idx,
-        "Index should be smaller than total number"
-    );
-    let z = idx % nz;
-    let r = idx / nz;
-    let y = r % ny;
-    let x = r / ny;
-    [x, y, z]
-}
+use crate::{
+    region::Rect,
+    utils::{indices::Index, Direction},
+    Container, NeighborList,
+};
 
 /// Determine and return the best configuration of processes to
 /// reduce surface area for communication
@@ -73,8 +53,7 @@ pub struct Domain<'a> {
     worker: Option<Box<&'a Worker>>,
     procs: AdjacentProcs,
     subdomain: Rect,
-    proc_dimensions: [usize; 3],
-    my_idx: [usize; 3],
+    proc_location: Index,
 }
 impl<'a> Domain<'a> {
     pub fn new() -> Self {
@@ -87,24 +66,24 @@ impl<'a> Domain<'a> {
             worker: None,
             procs: neighbor_procs,
             subdomain: Rect::new(0.0, 10.0, 0.0, 10.0, 0.0, 10.0),
-            proc_dimensions: [0, 0, 0],
-            my_idx: [0, 0, 0],
+            proc_location: Index::new(),
         }
     }
     pub fn init(&mut self, container: &Container, worker: Box<&'a Worker>) {
         self.worker = Some(worker);
 
         let num_threads = self.thread_ids().len();
-        self.proc_dimensions =
-            procs_in_box(num_threads, container.lx(), container.ly(), container.lz());
 
-        self.my_idx = linear_to_multi(
-            self.thread_ids()
-                .iter()
-                .position(|&id| thread::current().id() == id)
-                .unwrap(),
-            &self.proc_dimensions,
-        );
+        let proc_dimensions =
+            procs_in_box(num_threads, container.lx(), container.ly(), container.lz());
+        let idx = self
+            .thread_ids()
+            .iter()
+            .position(|&id| thread::current().id() == id)
+            .unwrap();
+        self.proc_location.set_bounds(proc_dimensions);
+        self.proc_location.set_idx(idx);
+
         self.reset_subdomain(container);
 
         self.setup_neighbor(Direction::Xlo, container);
@@ -123,12 +102,12 @@ impl<'a> Domain<'a> {
     fn setup_neighbor(&mut self, direction: Direction, container: &Container) {
         // Get index of neighbor (3d then 1d), if neighbor is present, send Option<mpsc::Sender> to main with proc idx, otherwise None and 0
         // Receive from main Option<mpsc::Sender> for opposite neighbor
-        let idx = self.get_1d_neighbor(&self.my_idx, direction.clone(), container);
-        let msg = match idx {
-            Some(i) => (Some(self.my_sender.clone()), i),
-            None => (None, 0),
+        let idx = self.get_neighbor(direction.clone(), container);
+        let message = match idx {
+            Some(i) => W2M::Sender(Some(self.my_sender.clone()), i.idx()),
+            None => W2M::Sender(None, 0),
         };
-        self.worker().send(W2M::Sender(msg.0, msg.1)).unwrap();
+        self.worker().send(message).unwrap();
         let msg = self.worker().recv();
         match msg {
             Ok(M2W::Sender(Some(sender))) => self.procs.set(direction.opposite(), sender),
@@ -141,16 +120,18 @@ impl<'a> Domain<'a> {
         self.worker.is_some()
     }
     pub fn reset_subdomain(&mut self, container: &Container) {
+        let bounds = self.proc_location.bounds();
         let l = [
-            container.lx() / (self.proc_dimensions[0] as f64),
-            container.ly() / (self.proc_dimensions[1] as f64),
-            container.lz() / (self.proc_dimensions[2] as f64),
+            container.lx() / (bounds[0] as f64),
+            container.ly() / (bounds[1] as f64),
+            container.lz() / (bounds[2] as f64),
         ];
         let lo = container.lo();
+        let idx3d = self.proc_location.to_3d();
         let sdlo = [
-            lo[0] + l[0] * self.my_idx[0] as f64,
-            lo[1] + l[1] * self.my_idx[1] as f64,
-            lo[2] + l[2] * self.my_idx[2] as f64,
+            lo[0] + l[0] * idx3d[0] as f64,
+            lo[1] + l[1] * idx3d[1] as f64,
+            lo[2] + l[2] * idx3d[2] as f64,
         ];
         self.subdomain = Rect::new(
             sdlo[0],
@@ -317,56 +298,38 @@ impl<'a> Domain<'a> {
             None => Ok(()),
         }
     }
-    fn get_3d_neighbor(
-        &self,
-        my_idx: &[usize; 3],
-        direction: Direction,
-        container: &Container,
-    ) -> Option<[usize; 3]> {
+    fn get_neighbor(&self, direction: Direction, container: &Container) -> Option<Index> {
         let axis_index = direction.axis().index();
+        let my_idx = self.proc_location.to_3d();
+        let bounds = self.proc_location.bounds();
+
+        let i = my_idx[axis_index];
+        let n = bounds[axis_index];
         let across_box = if direction.is_lo() {
-            my_idx[axis_index] == 0
+            i == 0
         } else {
-            my_idx[axis_index] == self.proc_dimensions[axis_index] - 1
+            i == n - 1
         };
-        let possible_neighbor = match (across_box, direction.is_lo()) {
+        let mut idx = my_idx.clone();
+        match (across_box, direction.is_lo()) {
             (false, false) => {
-                let mut idx = my_idx.clone();
                 idx[axis_index] += 1;
-                idx
             }
             (false, true) => {
-                let mut idx = my_idx.clone();
                 idx[axis_index] -= 1;
-                idx
             }
             (true, false) => {
-                let mut idx = my_idx.clone();
                 idx[axis_index] = 0;
-                idx
             }
             (true, true) => {
-                let mut idx = my_idx.clone();
-                idx[axis_index] = self.proc_dimensions[axis_index] - 1;
-                idx
+                idx[axis_index] = n - 1;
             }
         };
-        if across_box && !container.is_periodic(direction) {
+
+        if across_box && !container.is_periodic(direction.axis()) {
             None
         } else {
-            Some(possible_neighbor)
-        }
-    }
-    fn get_1d_neighbor(
-        &self,
-        my_idx: &[usize; 3],
-        direction: Direction,
-        container: &Container,
-    ) -> Option<usize> {
-        let idx3d = self.get_3d_neighbor(my_idx, direction, container);
-        match idx3d {
-            Some(idx) => Some(multi_to_linear(&idx, &self.proc_dimensions)),
-            None => None,
+            Some(Index::from_3d(&idx, &bounds))
         }
     }
 }
