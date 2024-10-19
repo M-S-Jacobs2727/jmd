@@ -62,7 +62,11 @@ impl Jmd {
             }
         }
     }
-    pub fn run(&mut self, num_threads: usize, f: fn(&mut Simulation) -> ()) -> Result<(), Error> {
+    pub fn run(
+        &mut self,
+        num_threads: usize,
+        f: fn(&mut Simulation) -> Result<(), Error>,
+    ) -> Result<(), Error> {
         self.setup(num_threads);
         for thread in &self.threads {
             thread.send(M2W::Run(f)).unwrap();

@@ -1,7 +1,7 @@
 // TODO: add more errortypes
 
 /// Error types
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub enum Error {
     AtomicPotentialError,
     IntegratorError,

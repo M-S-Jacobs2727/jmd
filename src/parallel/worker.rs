@@ -19,7 +19,7 @@ pub enum W2M {
 pub enum M2W {
     Error(Error),
     Setup(Vec<thread::ThreadId>),
-    Run(fn(&mut Simulation) -> ()),
+    Run(fn(&mut Simulation) -> Result<(), Error>),
     Sender(Option<mpsc::Sender<Message>>),
     ProcDims([usize; 3]),
 }
@@ -37,7 +37,7 @@ impl Worker {
             thread_ids: Vec::new(),
         }
     }
-    pub fn run_thread(&mut self) {
+    pub fn run_thread(&mut self) -> Result<(), Error> {
         self.tx
             .send(W2M::Id(thread::current().id()))
             .expect("Disconnect error");
@@ -67,18 +67,22 @@ impl Worker {
         self.send(W2M::Error(e)).unwrap();
     }
 
-    fn run(&self) {
+    fn run(&self) -> Result<(), Error> {
         let msg = self.rx.recv().unwrap();
-        match msg {
+        let res = match msg {
             M2W::Run(f) => {
                 let mut sim = Simulation::new();
                 let b = Box::new(self);
                 sim.init(b);
-                f(&mut sim);
+                f(&mut sim)
             }
-            M2W::Error(_) => return,
+            M2W::Error(_) => Err(Error::OtherError),
             _ => panic!("Invalid communication"),
         };
-        self.tx.send(W2M::Complete).unwrap();
+        match res {
+            Ok(_) => self.tx.send(W2M::Complete).unwrap(),
+            Err(e) => self.tx.send(W2M::Error(e)).unwrap(),
+        }
+        res
     }
 }
