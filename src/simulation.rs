@@ -2,7 +2,7 @@ use crate::{
     parallel::{message::Message, Domain, Worker},
     region::{Rect, RegionTrait},
     AtomicPotential, AtomicPotentialTrait, Atoms, Axis, Container, Direction, Error, NeighborList,
-    None_, UpdateSettings, BC,
+    None_, BC,
 };
 
 pub struct Simulation<'a> {
@@ -69,15 +69,12 @@ impl<'a> Simulation<'a> {
     pub fn set_domain(&mut self, domain: Domain<'a>) {
         self.domain = domain;
     }
-    pub fn set_neighbor_settings(&mut self, neighbor_settings: UpdateSettings) {
-        self.neighbor_list.update_settings = neighbor_settings;
-    }
 
-    pub fn compute_forces(&self) -> Vec<[f64; 3]> {
+    pub(crate) fn compute_forces(&self) -> Vec<[f64; 3]> {
         self.atomic_potential.compute_forces(&self.atoms)
     }
 
-    pub fn check_build_neighbor_list(&mut self, step: &usize) {
+    pub(crate) fn check_build_neighbor_list(&mut self, step: &usize) {
         if !self
             .neighbor_list
             .update_settings
@@ -91,7 +88,7 @@ impl<'a> Simulation<'a> {
         self.build_neighbor_list();
     }
 
-    pub fn build_neighbor_list(&mut self) {
+    pub(crate) fn build_neighbor_list(&mut self) {
         dbg!(self.atoms.positions());
         self.wrap_pbs();
         self.comm_atom_ownership();
@@ -99,7 +96,7 @@ impl<'a> Simulation<'a> {
         self.pos_at_prev_neigh_build = self.atoms.positions.clone();
     }
 
-    pub fn reverse_comm(&self, forces: &mut Vec<[f64; 3]>) {
+    pub(crate) fn reverse_comm(&self, forces: &mut Vec<[f64; 3]>) {
         let mut sent_ids: Vec<usize> = Vec::new();
 
         // z-direction
@@ -130,7 +127,7 @@ impl<'a> Simulation<'a> {
         self.recv_reverse_comm(forces);
     }
 
-    pub fn forward_comm(&mut self) {
+    pub(crate) fn forward_comm(&mut self) {
         // x-direction
         self.send_forward_comm(Direction::Xlo);
         self.recv_forward_comm();

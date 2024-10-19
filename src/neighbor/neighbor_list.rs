@@ -1,16 +1,6 @@
 use super::{Grid, UpdateSettings};
 use crate::{utils::distance_squared, Container};
 
-/// Used for computing a list of neighboring particles
-pub struct NeighborList {
-    grid: Grid,
-    force_distance: f64,
-    skin_distance: f64,
-    neighbor_distance: f64,
-    stencil: Vec<[i32; 3]>,
-    neighbors: Vec<Vec<usize>>,
-    pub update_settings: UpdateSettings,
-}
 fn compute_stencil(bin_size: f64, cutoff_distance: f64) -> Vec<[i32; 3]> {
     let max_number_out = (cutoff_distance / bin_size).ceil() as i32;
     let mut stencil: Vec<[i32; 3]> = Vec::new();
@@ -43,6 +33,15 @@ fn compute_stencil(bin_size: f64, cutoff_distance: f64) -> Vec<[i32; 3]> {
     stencil
 }
 
+/// Used for computing a list of neighboring particles
+pub struct NeighborList {
+    grid: Grid,
+    force_distance: f64,
+    skin_distance: f64,
+    stencil: Vec<[i32; 3]>,
+    neighbors: Vec<Vec<usize>>,
+    pub update_settings: UpdateSettings,
+}
 impl NeighborList {
     pub fn new(
         container: &Container,
@@ -61,7 +60,7 @@ impl NeighborList {
             "Neighbor skin distance ({}) must be positive",
             skin_distance
         );
-        let cutoff_distance = force_distance + skin_distance;
+        let cutoff_distance = skin_distance + force_distance;
         let grid = Grid::new(container, bin_size, cutoff_distance);
         let stencil = compute_stencil(bin_size, cutoff_distance);
         dbg!(&grid);
@@ -69,12 +68,13 @@ impl NeighborList {
             grid,
             force_distance,
             skin_distance,
-            neighbor_distance: cutoff_distance,
             stencil,
             neighbors,
             update_settings: UpdateSettings::new(1, 0, true),
         }
     }
+
+    // Getters
     pub fn neighbors(&self) -> &Vec<Vec<usize>> {
         &self.neighbors
     }
@@ -85,17 +85,35 @@ impl NeighborList {
         self.skin_distance.clone()
     }
     pub fn neighbor_distance(&self) -> f64 {
-        self.neighbor_distance.clone()
+        self.skin_distance() + self.force_distance()
     }
     pub fn grid(&self) -> &Grid {
         &self.grid
     }
+    pub fn update_settigs(&self) -> &UpdateSettings {
+        &self.update_settings
+    }
+
+    // Setters
+    pub fn set_grid(&mut self, grid: Grid) {
+        self.grid = grid
+    }
+    pub fn set_skin_distance(&mut self, skin_distance: f64) {
+        if skin_distance <= 0.0 {
+            panic!("Skin distance must be positive, found {}", skin_distance);
+        }
+        self.skin_distance = skin_distance;
+    }
+    pub fn set_update_settings(&mut self, update_settings: UpdateSettings) {
+        self.update_settings = update_settings
+    }
+
     pub fn update(&mut self, positions: &Vec<[f64; 3]>) {
         let num_atoms = positions.len();
 
         self.neighbors.clear();
         self.neighbors.resize(num_atoms, Vec::new());
-        let neigh_dist_sq = self.neighbor_distance * self.neighbor_distance;
+        let neigh_dist_sq = self.neighbor_distance() * self.neighbor_distance();
 
         // dbg!(positions);
         let atom_indices_per_bin = self.bin_atoms(&positions);
