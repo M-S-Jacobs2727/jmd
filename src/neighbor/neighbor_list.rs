@@ -1,5 +1,5 @@
 use super::{Grid, UpdateSettings};
-use crate::{utils::distance_squared, Container};
+use crate::{utils::computations::distance_squared, Container};
 
 fn compute_stencil(bin_size: f64, cutoff_distance: f64) -> Vec<[i32; 3]> {
     let max_number_out = (cutoff_distance / bin_size).ceil() as i32;
