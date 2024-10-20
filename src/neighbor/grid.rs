@@ -1,11 +1,13 @@
-use crate::Container;
+use ndarray::{Array1, ArrayView1, Axis};
+
+use crate::{utils::indices::Index, Container};
 
 /// Neighbor list grid of bins
 #[derive(Debug)]
 pub struct Grid {
-    lo_corner: [f64; 3],
+    lo_corner: ndarray::Array1<f64>,
     bin_size: f64,
-    num_bins: [usize; 3],
+    num_bins: ndarray::Array1<usize>,
 }
 impl Grid {
     pub fn new(container: &Container, bin_size: f64, cutoff_distance: f64) -> Self {
@@ -22,16 +24,16 @@ impl Grid {
             bin_size,
             min_box_length
         );
-        let lo_corner = [
+        let lo_corner = ndarray::arr1(&[
             container.xlo() - cutoff_distance,
             container.ylo() - cutoff_distance,
             container.zlo() - cutoff_distance,
-        ];
-        let num_bins: [usize; 3] = [
+        ]);
+        let num_bins = ndarray::arr1(&[
             ((container.lx() + 2.0 * cutoff_distance) / bin_size).ceil() as usize,
             ((container.ly() + 2.0 * cutoff_distance) / bin_size).ceil() as usize,
             ((container.lz() + 2.0 * cutoff_distance) / bin_size).ceil() as usize,
-        ];
+        ]);
         Self {
             lo_corner,
             bin_size,
@@ -44,18 +46,14 @@ impl Grid {
     pub fn total_num_bins(&self) -> usize {
         self.num_bins[0] * self.num_bins[1] * self.num_bins[2]
     }
-    pub fn lo_corner(&self) -> [f64; 3] {
-        self.lo_corner.clone()
+    pub fn lo_corner<'a>(&'a self) -> ArrayView1<'a, f64> {
+        self.lo_corner.view()
     }
-    pub fn hi_corner(&self) -> [f64; 3] {
-        [
-            self.lo_corner[0] + self.bin_size * self.num_bins[0] as f64,
-            self.lo_corner[1] + self.bin_size * self.num_bins[1] as f64,
-            self.lo_corner[2] + self.bin_size * self.num_bins[2] as f64,
-        ]
+    pub fn hi_corner(&self) -> Array1<f64> {
+        &self.lo_corner + self.num_bins().mapv(|n| self.bin_size * n as f64)
     }
-    pub fn num_bins(&self) -> &[usize; 3] {
-        &self.num_bins
+    pub fn num_bins<'a>(&'a self) -> ArrayView1<'a, usize> {
+        self.num_bins.view()
     }
     pub fn bin_idx_to_3d_idx(&self, bin_idx: usize) -> [i32; 3] {
         assert!(
@@ -82,13 +80,16 @@ impl Grid {
             + (inds[1] as usize) * self.num_bins[2]
             + (inds[2] as usize)
     }
-    pub fn coord_to_3d_idx(&self, coord: &[f64; 3]) -> [i32; 3] {
-        let mut inds: [i32; 3] = [0, 0, 0];
+    pub fn coords_to_linear_indices<'a>(&self, coords: &ndarray::Array2<f64>) -> Array1<usize> {
         let num_bins = self.num_bins();
-        for i in 0..3 {
-            inds[i] = ((((coord[i] - self.lo_corner[i]) / self.bin_size).floor() as i32)
-                % num_bins[i] as i32) as i32;
-        }
-        inds
+        assert_eq!(coords.len_of(Axis(1)), self.lo_corner.len_of(Axis(0)));
+
+        let x = ((coords - &self.lo_corner) / self.bin_size).floor();
+        let mut y: ndarray::Array2<usize> = ndarray::Array2::zeros(x.dim());
+        ndarray::azip!((index (i, j), &x in &x) {y[[i, j]] = (x as usize) % num_bins[j]});
+
+        y.axis_iter(Axis(0))
+            .map(|yi| Index::from_3d(yi, self.num_bins()).idx())
+            .collect()
     }
 }

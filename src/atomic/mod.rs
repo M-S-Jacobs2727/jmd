@@ -2,6 +2,7 @@ mod ljcut;
 mod none;
 
 pub use ljcut::LJCut;
+use ndarray::Array2;
 pub use none::None_;
 
 use enum_dispatch::enum_dispatch;
@@ -20,7 +21,7 @@ pub trait AtomicPotentialTrait {
     fn cutoff_distance(&self) -> f64;
 
     /// Compute the pairwise force given a configuration of atoms
-    fn compute_forces(&self, atoms: &Atoms) -> Vec<[f64; 3]>;
+    fn compute_forces(&self, atoms: &Atoms) -> Array2<f64>;
 
     /// Increase or decrease the number of atom types
     fn set_num_types(&mut self, num_types: usize) -> Result<(), Error>;

@@ -1,3 +1,5 @@
+use ndarray::Array2;
+
 use super::AtomicPotentialTrait;
 use crate::Atoms;
 
@@ -11,11 +13,9 @@ impl AtomicPotentialTrait for None_ {
     fn cutoff_distance(&self) -> f64 {
         0.0
     }
-    fn compute_forces(&self, atoms: &Atoms) -> Vec<[f64; 3]> {
+    fn compute_forces(&self, atoms: &Atoms) -> Array2<f64> {
         let natoms = atoms.num_atoms();
-        let mut forces = Vec::new();
-        forces.resize(natoms, [0.0, 0.0, 0.0]);
-        forces
+        Array2::zeros([natoms, 3])
     }
     fn set_num_types(&mut self, _num_types: usize) -> Result<(), crate::Error> {
         Ok(())

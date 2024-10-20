@@ -17,7 +17,7 @@ use crate::{
 
 /// Determine and return the best configuration of processes to
 /// reduce surface area for communication
-fn procs_in_box(nprocs: usize, lx: f64, ly: f64, lz: f64) -> [usize; 3] {
+fn procs_in_box(nprocs: usize, lx: f64, ly: f64, lz: f64) -> ndarray::Array1<usize> {
     // This score is proportional to the surface area and therefore should be minimized
     let score = |nx: usize, ny: usize, nz: usize| {
         lx * ly / (nx * ny) as f64 + ly * lz / (ny * nz) as f64 + lx * lz / (nx * nz) as f64
@@ -43,7 +43,7 @@ fn procs_in_box(nprocs: usize, lx: f64, ly: f64, lz: f64) -> [usize; 3] {
         .reduce(|x, y| if x.2 < y.2 { x } else { y })
         .unwrap();
 
-    [factors[i], factors[j], nprocs / factors[i] / factors[j]]
+    ndarray::arr1(&[factors[i], factors[j], nprocs / factors[i] / factors[j]])
 }
 
 /// Represents a process in relation to the other neighboring processes
@@ -66,7 +66,7 @@ impl<'a> Domain<'a> {
             worker: None,
             procs: neighbor_procs,
             subdomain: Rect::new(0.0, 10.0, 0.0, 10.0, 0.0, 10.0),
-            proc_location: Index::new(),
+            proc_location: Index::new(3),
         }
     }
     pub fn init(&mut self, container: &Container, worker: Box<&'a Worker>) {
@@ -329,7 +329,7 @@ impl<'a> Domain<'a> {
         if across_box && !container.is_periodic(direction.axis()) {
             None
         } else {
-            Some(Index::from_3d(&idx, &bounds))
+            Some(Index::from_3d(idx.view(), bounds))
         }
     }
 }

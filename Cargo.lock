@@ -136,6 +136,7 @@ dependencies = [
  "enum_dispatch",
  "hdf5",
  "ndarray 0.16.1",
+ "num-traits",
  "rand",
 ]
 

@@ -1,3 +1,5 @@
+use ndarray::{s, Array2};
+
 use super::AtomicPotentialTrait;
 use crate::{utils::Types, Atoms, Error};
 
@@ -99,12 +101,12 @@ impl AtomicPotentialTrait for LJCut {
         self.force_cutoff.clone()
     }
     // TODO: check that forces are not double counted (newton-pair half, not full)
-    fn compute_forces(&self, atoms: &Atoms) -> Vec<[f64; 3]> {
+    fn compute_forces(&self, atoms: &Atoms) -> Array2<f64> {
         let mut forces: Vec<[f64; 3]> = Vec::new();
         forces.resize(atoms.num_atoms(), [0.0, 0.0, 0.0]);
         for i in 0..atoms.nlocal {
             let typei = &atoms.types[i];
-            let posi = &atoms.positions[i];
+            let posi = &atoms.positions[s![i, ..]];
 
             for j in 0..atoms.num_atoms() {
                 if i == j {

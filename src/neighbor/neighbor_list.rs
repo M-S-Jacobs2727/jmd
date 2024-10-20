@@ -118,7 +118,7 @@ impl NeighborList {
         // dbg!(positions);
         let atom_indices_per_bin = self.bin_atoms(&positions);
         for (i, pos) in positions.iter().enumerate() {
-            let bin_idx = self.grid.coord_to_3d_idx(pos);
+            let bin_idx = self.grid.coords_to_linear_indices(pos);
             // dbg!(&bin_idx);
             for offset in &self.stencil {
                 let comp_bin = [
@@ -142,7 +142,7 @@ impl NeighborList {
             .iter()
             .map(|p| {
                 // dbg!(p);
-                self.grid.coord_to_3d_idx(p)
+                self.grid.coords_to_linear_indices(p)
             })
             .enumerate()
             .for_each(|(atom_idx, bin_idx)| {

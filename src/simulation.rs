@@ -1,3 +1,5 @@
+use ndarray::Array2;
+
 use crate::{
     parallel::{message::Message, Domain, Worker},
     region::{Rect, RegionTrait},
@@ -12,7 +14,7 @@ pub struct Simulation<'a> {
     neighbor_list: NeighborList,
     domain: Domain<'a>,
     nlocal: usize,
-    pos_at_prev_neigh_build: Vec<[f64; 3]>,
+    pos_at_prev_neigh_build: Array2<f64>,
 }
 
 impl<'a> Simulation<'a> {
@@ -26,7 +28,7 @@ impl<'a> Simulation<'a> {
             neighbor_list,
             domain: Domain::new(),
             nlocal: 0,
-            pos_at_prev_neigh_build: Vec::new(),
+            pos_at_prev_neigh_build: Array2::zeros([0, 0]),
         }
     }
 
@@ -70,7 +72,7 @@ impl<'a> Simulation<'a> {
         self.domain = domain;
     }
 
-    pub(crate) fn compute_forces(&self) -> Vec<[f64; 3]> {
+    pub(crate) fn compute_forces(&self) -> Array2<f64> {
         self.atomic_potential.compute_forces(&self.atoms)
     }
 
@@ -89,10 +91,10 @@ impl<'a> Simulation<'a> {
     }
 
     pub(crate) fn build_neighbor_list(&mut self) {
-        dbg!(self.atoms.positions());
+        dbg!(self.atoms.positions);
         self.wrap_pbs();
         self.comm_atom_ownership();
-        self.neighbor_list.update(self.atoms.positions());
+        self.neighbor_list.update(self.atoms.positions);
         self.pos_at_prev_neigh_build = self.atoms.positions.clone();
     }
 
@@ -154,31 +156,40 @@ impl<'a> Simulation<'a> {
 
     fn wrap_pbs(&mut self) {
         if self.container.is_periodic(Axis::X) {
-            self.atoms.positions.iter_mut().for_each(|p| {
-                if p[0] < self.container.xlo() {
-                    p[0] += self.container.lx();
-                } else if p[0] > self.container.xhi() {
-                    p[0] -= self.container.lx();
-                }
-            });
+            self.atoms
+                .positions
+                .axis_iter_mut(ndarray::Axis(0))
+                .for_each(|mut p| {
+                    if p[0] < self.container.xlo() {
+                        p[0] += self.container.lx();
+                    } else if p[0] > self.container.xhi() {
+                        p[0] -= self.container.lx();
+                    }
+                });
         }
         if self.container.is_periodic(Axis::Y) {
-            self.atoms.positions.iter_mut().for_each(|p| {
-                if p[1] < self.container.ylo() {
-                    p[1] += self.container.ly();
-                } else if p[1] > self.container.yhi() {
-                    p[1] -= self.container.ly();
-                }
-            });
+            self.atoms
+                .positions
+                .axis_iter_mut(ndarray::Axis(0))
+                .for_each(|p| {
+                    if p[1] < self.container.ylo() {
+                        p[1] += self.container.ly();
+                    } else if p[1] > self.container.yhi() {
+                        p[1] -= self.container.ly();
+                    }
+                });
         }
         if self.container.is_periodic(Axis::Z) {
-            self.atoms.positions.iter_mut().for_each(|p| {
-                if p[2] < self.container.zlo() {
-                    p[2] += self.container.lz();
-                } else if p[2] > self.container.zhi() {
-                    p[2] -= self.container.lz();
-                }
-            });
+            self.atoms
+                .positions
+                .axis_iter_mut(ndarray::Axis(0))
+                .for_each(|p| {
+                    if p[2] < self.container.zlo() {
+                        p[2] += self.container.lz();
+                    } else if p[2] > self.container.zhi() {
+                        p[2] -= self.container.lz();
+                    }
+                });
         }
     }
 

@@ -8,6 +8,7 @@ enum_dispatch = "0.3.13"
 hdf5 = "0.8.1"
 ndarray = "0.16.1"
 rand = "0.8.5"
+num-traits = "0.2.19"
 
 [[example]]
 name = "basic"
