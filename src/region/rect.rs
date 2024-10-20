@@ -1,4 +1,4 @@
-use super::RegionTrait;
+use super::Region;
 use crate::Container;
 
 use rand;
@@ -77,7 +77,7 @@ impl Rect {
         [self.xhi, self.yhi, self.zhi]
     }
 }
-impl RegionTrait for Rect {
+impl Region for Rect {
     fn contains(&self, coord: &[f64; 3]) -> bool {
         self.xlo <= coord[0]
             && coord[0] <= self.xhi

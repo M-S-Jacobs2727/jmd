@@ -4,18 +4,10 @@ mod none;
 pub use ljcut::LJCut;
 pub use none::None_;
 
-use enum_dispatch::enum_dispatch;
-
 use crate::{Atoms, Error};
 
-#[enum_dispatch]
-pub enum AtomicPotential {
-    LJCut,
-    None_,
-}
-#[enum_dispatch(AtomicPotential)]
 /// Trait for pairwise atomic potentials
-pub trait AtomicPotentialTrait {
+pub trait AtomicPotential {
     /// Get the maximum distance for effective interaction
     fn cutoff_distance(&self) -> f64;
 

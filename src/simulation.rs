@@ -1,14 +1,13 @@
 use crate::{
     parallel::{message::Message, Domain, Worker},
-    region::{Rect, RegionTrait},
-    AtomicPotential, AtomicPotentialTrait, Atoms, Axis, Container, Direction, Error, NeighborList,
-    None_, BC,
+    region::{Rect, Region},
+    AtomicPotential, Atoms, Axis, Container, Direction, Error, NeighborList, None_, BC,
 };
 
 pub struct Simulation<'a> {
     pub atoms: Atoms,
     container: Container,
-    atomic_potential: AtomicPotential,
+    atomic_potential: Box<dyn AtomicPotential>,
     neighbor_list: NeighborList,
     domain: Domain<'a>,
     nlocal: usize,
@@ -22,7 +21,7 @@ impl<'a> Simulation<'a> {
         Self {
             atoms: Atoms::new(),
             container,
-            atomic_potential: None_::new().into(),
+            atomic_potential: Box::new(None_::new()),
             neighbor_list,
             domain: Domain::new(),
             nlocal: 0,
@@ -34,7 +33,7 @@ impl<'a> Simulation<'a> {
     pub fn container(&self) -> &Container {
         &self.container
     }
-    pub fn atomic_potential(&self) -> &crate::AtomicPotential {
+    pub fn atomic_potential(&self) -> &Box<dyn crate::AtomicPotential> {
         &self.atomic_potential
     }
     pub fn neighbor_list(&self) -> &NeighborList {
@@ -55,8 +54,8 @@ impl<'a> Simulation<'a> {
         self.container = container;
         self.domain.reset_subdomain(&self.container);
     }
-    pub fn set_atomic_potential(&mut self, atomic_potential: AtomicPotential) {
-        self.atomic_potential = atomic_potential;
+    pub fn set_atomic_potential(&mut self, atomic_potential: impl AtomicPotential + 'static) {
+        self.atomic_potential = Box::new(atomic_potential);
         let force_distance = self.atomic_potential.cutoff_distance();
         let skin_distance = 1.0;
         let bin_size = (force_distance + skin_distance) * 0.5;

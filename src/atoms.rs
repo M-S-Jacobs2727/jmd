@@ -1,8 +1,4 @@
-use crate::{
-    neighbor,
-    region::{Region, RegionTrait},
-    utils,
-};
+use crate::{neighbor, region::Region, utils};
 
 /// Atom properties during simulation, not including forces
 pub struct Atoms {
@@ -80,7 +76,7 @@ impl Atoms {
     }
     pub fn add_random_atoms(
         &mut self,
-        region: &Region,
+        region: &impl Region,
         num_atoms: usize,
         atom_type: u32,
         mass: f64,

@@ -1,4 +1,4 @@
-use super::IntegratorTrait;
+use super::Integrator;
 use crate::Simulation;
 
 /// Velocity-verlet integrator
@@ -41,7 +41,7 @@ impl Verlet {
     }
 }
 
-impl IntegratorTrait for Verlet {
+impl Integrator for Verlet {
     fn run(&self, simulation: &mut Simulation, num_steps: usize) {
         simulation.forward_comm();
         simulation.build_neighbor_list();

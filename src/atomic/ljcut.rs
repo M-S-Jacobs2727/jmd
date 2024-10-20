@@ -1,4 +1,4 @@
-use super::AtomicPotentialTrait;
+use super::AtomicPotential;
 use crate::{utils::Types, Atoms, Error};
 
 #[derive(Clone, Copy, Debug)]
@@ -94,7 +94,7 @@ impl LJCut {
     }
 }
 
-impl AtomicPotentialTrait for LJCut {
+impl AtomicPotential for LJCut {
     fn cutoff_distance(&self) -> f64 {
         self.force_cutoff.clone()
     }
