@@ -45,7 +45,7 @@ impl Grid {
         self.num_bins[0] * self.num_bins[1] * self.num_bins[2]
     }
     pub fn lo_corner(&self) -> [f64; 3] {
-        self.lo_corner.clone()
+        self.lo_corner
     }
     pub fn hi_corner(&self) -> [f64; 3] {
         [
@@ -54,8 +54,8 @@ impl Grid {
             self.lo_corner[2] + self.bin_size * self.num_bins[2] as f64,
         ]
     }
-    pub fn num_bins(&self) -> &[usize; 3] {
-        &self.num_bins
+    pub fn num_bins(&self) -> [usize; 3] {
+        self.num_bins
     }
     pub fn bin_idx_to_3d_idx(&self, bin_idx: usize) -> [i32; 3] {
         assert!(

@@ -11,7 +11,7 @@ pub fn get_sort_indices(bin_indices: &Vec<usize>) -> Vec<usize> {
     }
     let len = bin_indices.len();
     let mut counts: Vec<usize> = Vec::new();
-    counts.resize(bin_indices.iter().max().unwrap().clone(), 0);
+    counts.resize(*bin_indices.iter().max().unwrap(), 0);
 
     for b in bin_indices {
         counts[*b] += 1;

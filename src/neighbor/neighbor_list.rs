@@ -79,13 +79,13 @@ impl NeighborList {
         &self.neighbors
     }
     pub fn force_distance(&self) -> f64 {
-        self.force_distance.clone()
+        self.force_distance
     }
     pub fn skin_distance(&self) -> f64 {
-        self.skin_distance.clone()
+        self.skin_distance
     }
     pub fn neighbor_distance(&self) -> f64 {
-        self.skin_distance() + self.force_distance()
+        self.skin_distance + self.force_distance
     }
     pub fn grid(&self) -> &Grid {
         &self.grid

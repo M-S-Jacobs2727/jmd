@@ -30,10 +30,10 @@ impl Index {
         [x, y, z]
     }
     pub fn idx(&self) -> usize {
-        self.idx.clone()
+        self.idx
     }
     pub fn bounds(&self) -> [usize; 3] {
-        self.bounds.clone()
+        self.bounds
     }
 
     pub(crate) fn set_bounds(&mut self, bounds: [usize; 3]) {

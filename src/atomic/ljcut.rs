@@ -75,12 +75,11 @@ impl LJCut {
             return Err(Error::AtomicPotentialError);
         }
 
-        let coeff = LJCutCoeff::new(sigma, epsilon, rcut);
         for i in &itypes {
             for j in &jtypes {
                 let index = self.type_idx(*i, *j);
                 self.coeff_set[index] = true;
-                self.coeffs[index] = coeff.clone();
+                self.coeffs[index] = LJCutCoeff::new(sigma, epsilon, rcut);
             }
         }
 
@@ -96,7 +95,7 @@ impl LJCut {
 
 impl AtomicPotential for LJCut {
     fn cutoff_distance(&self) -> f64 {
-        self.force_cutoff.clone()
+        self.force_cutoff
     }
     // TODO: check that forces are not double counted (newton-pair half, not full)
     fn compute_forces(&self, atoms: &Atoms) -> Vec<[f64; 3]> {
@@ -179,7 +178,7 @@ impl AtomicPotential for LJCut {
         energy
     }
     fn num_types(&self) -> usize {
-        self.num_types.clone()
+        self.num_types
     }
     fn set_num_types(&mut self, num_types: usize) -> Result<(), Error> {
         if self.num_types == num_types {
