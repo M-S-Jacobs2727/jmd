@@ -4,11 +4,7 @@ use std::{
     thread::{self, ThreadId},
 };
 
-use super::{
-    message::Message,
-    worker::{Worker, M2W, W2M},
-    AdjacentProcs,
-};
+use super::{message as msg, worker::Worker, AdjacentProcs};
 use crate::{
     region::Rect,
     utils::{indices::Index, Direction},
@@ -48,8 +44,8 @@ fn procs_in_box(nprocs: usize, lx: f64, ly: f64, lz: f64) -> [usize; 3] {
 
 /// Represents a process in relation to the other neighboring processes
 pub struct Domain<'a> {
-    receiver: mpsc::Receiver<Message>,
-    my_sender: mpsc::Sender<Message>,
+    receiver: mpsc::Receiver<msg::Message>,
+    my_sender: mpsc::Sender<msg::Message>,
     worker: Option<Box<&'a Worker>>,
     procs: AdjacentProcs,
     subdomain: Rect,
@@ -96,7 +92,7 @@ impl<'a> Domain<'a> {
     pub fn subdomain(&self) -> &Rect {
         &self.subdomain
     }
-    fn worker(&self) -> &Box<&'a Worker> {
+    pub fn worker(&self) -> &Box<&'a Worker> {
         self.worker.as_ref().expect("Must init")
     }
     fn setup_neighbor(&mut self, direction: Direction, container: &Container) {
@@ -104,14 +100,14 @@ impl<'a> Domain<'a> {
         // Receive from main Option<mpsc::Sender> for opposite neighbor
         let idx = self.get_neighbor(direction.clone(), container);
         let message = match idx {
-            Some(i) => W2M::Sender(Some(self.my_sender.clone()), i.idx()),
-            None => W2M::Sender(None, 0),
+            Some(i) => msg::W2M::Sender(Some(self.my_sender.clone()), i.idx()),
+            None => msg::W2M::Sender(None, 0),
         };
-        self.worker().send(message).unwrap();
+        self.worker().send(message);
         let msg = self.worker().recv();
         match msg {
-            Ok(M2W::Sender(Some(sender))) => self.procs.set(direction.opposite(), sender),
-            Ok(M2W::Sender(None)) => {}
+            Ok(msg::M2W::Sender(Some(sender))) => self.procs.set(direction.opposite(), sender),
+            Ok(msg::M2W::Sender(None)) => {}
             Ok(_) => panic!("Invalid message"),
             _ => panic!("Disconnect error"),
         };
@@ -255,16 +251,16 @@ impl<'a> Domain<'a> {
         }
     }
 
-    pub fn clone_sender(&self) -> mpsc::Sender<Message> {
+    pub fn clone_sender(&self) -> mpsc::Sender<msg::Message> {
         self.my_sender.clone()
     }
-    pub fn receiver(&self) -> &mpsc::Receiver<Message> {
+    pub fn receiver(&self) -> &mpsc::Receiver<msg::Message> {
         &self.receiver
     }
     pub fn neighbor_procs(&self) -> &AdjacentProcs {
         &self.procs
     }
-    pub fn set_neighbor_proc(&mut self, direction: Direction, sender: mpsc::Sender<Message>) {
+    pub fn set_neighbor_proc(&mut self, direction: Direction, sender: mpsc::Sender<msg::Message>) {
         self.procs.set(direction, sender);
     }
     pub fn thread_ids(&self) -> &Vec<ThreadId> {
@@ -277,14 +273,14 @@ impl<'a> Domain<'a> {
             .filter(|&&p| (*p).is_some())
             .count()
     }
-    pub fn receive(&self) -> Result<Message, mpsc::RecvError> {
+    pub fn receive(&self) -> Result<msg::Message, mpsc::RecvError> {
         self.receiver.recv()
     }
     pub fn send(
         &self,
-        value: Message,
+        value: msg::Message,
         neighbor: Direction,
-    ) -> Result<(), mpsc::SendError<Message>> {
+    ) -> Result<(), mpsc::SendError<msg::Message>> {
         let n = match neighbor {
             Direction::Xlo => self.procs.xlo(),
             Direction::Xhi => self.procs.xhi(),
@@ -298,6 +294,10 @@ impl<'a> Domain<'a> {
             None => Ok(()),
         }
     }
+    pub(crate) fn send_to_main(&self, message: msg::W2M) {
+        self.worker().send(message);
+    }
+
     fn get_neighbor(&self, direction: Direction, container: &Container) -> Option<Index> {
         let axis_index = direction.axis().index();
         let my_idx = self.proc_location.to_3d();

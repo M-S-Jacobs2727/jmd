@@ -61,6 +61,7 @@ impl Integrator for Verlet {
 
             self.increment_velocity_halfstep(simulation, &forces);
 
+            simulation.check_do_output(&step);
             dbg!(&simulation.atoms.positions);
         }
     }

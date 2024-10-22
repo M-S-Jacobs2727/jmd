@@ -1,5 +1,5 @@
 use super::AtomicPotential;
-use crate::{utils::Types, Atoms, Error};
+use crate::{utils::Types, Error, Simulation};
 
 #[derive(Clone, Copy, Debug)]
 struct LJCutCoeff {
@@ -97,16 +97,17 @@ impl AtomicPotential for LJCut {
     fn cutoff_distance(&self) -> f64 {
         self.force_cutoff
     }
-    // TODO: check that forces are not double counted (newton-pair half, not full)
-    fn compute_forces(&self, atoms: &Atoms) -> Vec<[f64; 3]> {
+    // TODO: check that forces are not double counted
+    // should be newton-pair full, not half, because half neighbor list
+    fn compute_forces(&self, sim: &Simulation) -> Vec<[f64; 3]> {
         let mut forces: Vec<[f64; 3]> = Vec::new();
-        forces.resize(atoms.num_atoms(), [0.0, 0.0, 0.0]);
-        for i in 0..atoms.nlocal {
-            let typei = &atoms.types[i];
-            let posi = &atoms.positions[i];
+        forces.resize(sim.atoms.num_atoms(), [0.0, 0.0, 0.0]);
+        for i in 0..sim.atoms.nlocal {
+            let typei = &sim.atoms.types[i];
+            let posi = &sim.atoms.positions[i];
 
-            for j in 0..atoms.num_atoms() {
-                if i == j {
+            for j in &sim.neighbor_list().neighbors()[i] {
+                if i == *j {
                     continue;
                 }
                 // U(r) = 4 eps ((sig/r)^12 - (sig/r)^6) - const
@@ -118,8 +119,8 @@ impl AtomicPotential for LJCut {
                 // f(r_ij) = r_ij * -24 eps / sig^2, so if r_ij = r_j - r_i = (sig, 0),
                 // then f_i = f(r_ij) and f_j = -f(r_ij)
 
-                let typej = &atoms.types[j];
-                let posj = &atoms.positions[j];
+                let typej = &sim.atoms.types[*j];
+                let posj = &sim.atoms.positions[*j];
 
                 let coeff = self.coeffs[self.type_idx(*typei, *typej)];
                 let r = [posi[0] - posj[0], posi[1] - posj[1], posi[2] - posj[2]];
@@ -133,20 +134,21 @@ impl AtomicPotential for LJCut {
 
                 let f_mag = coeff.prefactor / r6 / r2 * (2.0 * coeff.sigma6 / r6 - 1.0);
                 forces[i] = [r[0] * f_mag, r[1] * f_mag, r[2] * f_mag];
+                forces[*j] = [-r[0] * f_mag, -r[1] * f_mag, -r[2] * f_mag];
             }
         }
 
         forces
     }
-    fn compute_energy(&self, atoms: &Atoms) -> f64 {
+    fn compute_potential_energy(&self, sim: &Simulation) -> f64 {
         let mut energy = 0.0;
 
-        for i in 0..atoms.nlocal {
-            let typei = &atoms.types[i];
-            let posi = &atoms.positions[i];
+        for i in 0..sim.atoms.nlocal {
+            let typei = &sim.atoms.types[i];
+            let posi = &sim.atoms.positions[i];
 
-            for j in 0..atoms.num_atoms() {
-                if i == j {
+            for j in &sim.neighbor_list().neighbors()[i] {
+                if i == *j {
                     continue;
                 }
                 // U(r) = 4 eps ((sig/r)^12 - (sig/r)^6) - const
@@ -158,8 +160,8 @@ impl AtomicPotential for LJCut {
                 // f(r_ij) = r_ij * -24 eps / sig^2, so if r_ij = r_j - r_i = (sig, 0),
                 // then f_i = f(r_ij) and f_j = -f(r_ij)
 
-                let typej = &atoms.types[j];
-                let posj = &atoms.positions[j];
+                let typej = &sim.atoms.types[*j];
+                let posj = &sim.atoms.positions[*j];
 
                 let coeff = self.coeffs[self.type_idx(*typei, *typej)];
                 let r = [posi[0] - posj[0], posi[1] - posj[1], posi[2] - posj[2]];

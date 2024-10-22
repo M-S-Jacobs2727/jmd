@@ -5,11 +5,13 @@ pub mod atomic;
 // TODO: check best implementation of "atom has moved half the bin size"
 
 mod atoms;
+mod compute;
 mod container;
 mod error;
 mod integrators;
 mod jmd;
 mod neighbor;
+mod output;
 mod parallel;
 pub mod region;
 mod simulation;
@@ -17,10 +19,12 @@ mod utils;
 
 pub use atomic::*;
 pub use atoms::Atoms;
+pub use compute::*;
 pub use container::{Container, BC};
 pub use error::Error;
 pub use integrators::*;
 pub use jmd::Jmd;
 pub use neighbor::{NeighborList, UpdateSettings};
+pub use output::{Output, OutputSpec};
 pub use simulation::Simulation;
 pub use utils::{Axis, Direction};

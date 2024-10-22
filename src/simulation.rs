@@ -1,5 +1,9 @@
 use crate::{
-    parallel::{message::Message, Domain, Worker},
+    output,
+    parallel::{
+        message::{self as msg, Message},
+        Domain, Worker,
+    },
     region::{Rect, Region},
     AtomicPotential, Atoms, Axis, Container, Direction, Error, NeighborList, None_, BC,
 };
@@ -10,10 +14,10 @@ pub struct Simulation<'a> {
     atomic_potential: Box<dyn AtomicPotential>,
     neighbor_list: NeighborList,
     domain: Domain<'a>,
+    output: output::Output,
     nlocal: usize,
     pos_at_prev_neigh_build: Vec<[f64; 3]>,
 }
-
 impl<'a> Simulation<'a> {
     pub fn new() -> Self {
         let container = Container::new(0., 10., 0.0, 10.0, 0.0, 10.0, BC::PP, BC::PP, BC::PP);
@@ -24,6 +28,7 @@ impl<'a> Simulation<'a> {
             atomic_potential: Box::new(None_::new()),
             neighbor_list,
             domain: Domain::new(),
+            output: output::Output::new(),
             nlocal: 0,
             pos_at_prev_neigh_build: Vec::new(),
         }
@@ -68,9 +73,29 @@ impl<'a> Simulation<'a> {
     pub fn set_domain(&mut self, domain: Domain<'a>) {
         self.domain = domain;
     }
+    pub fn set_output(&mut self, output: output::Output) {
+        self.output = output.clone();
+        self.domain
+            .send_to_main(msg::W2M::SetupOutput(output.values));
+    }
+
+    fn compute_local_pe(&self) -> f64 {
+        self.atomic_potential.compute_potential_energy(self)
+    }
+    fn compute_local_ke(&self) -> f64 {
+        0.5 * self
+            .atoms
+            .velocities
+            .iter()
+            .zip(self.atoms.masses.iter())
+            .take(self.nlocal)
+            .map(|(v, m)| m * (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]))
+            .reduce(|acc, t| acc + t)
+            .unwrap_or(0.0)
+    }
 
     pub(crate) fn compute_forces(&self) -> Vec<[f64; 3]> {
-        self.atomic_potential.compute_forces(&self.atoms)
+        self.atomic_potential.compute_forces(self)
     }
 
     pub(crate) fn check_build_neighbor_list(&mut self, step: &usize) {
@@ -406,5 +431,52 @@ impl<'a> Simulation<'a> {
         self.atoms.masses.append(&mut masses);
         self.atoms.positions.append(&mut positions);
         self.atoms.velocities.append(&mut velocities);
+    }
+
+    pub(crate) fn check_do_output(&self, step: &usize) {
+        if step % self.output.every != 0 {
+            return;
+        }
+
+        let ke = if self.output.values.contains(&output::OutputSpec::KineticE)
+            || self.output.values.contains(&output::OutputSpec::Temp)
+            || self.output.values.contains(&output::OutputSpec::TotalE)
+        {
+            Some(self.compute_local_ke())
+        } else {
+            None
+        };
+
+        let pe = if self.output.values.contains(&output::OutputSpec::PotentialE)
+            || self.output.values.contains(&output::OutputSpec::TotalE)
+        {
+            Some(self.compute_local_pe())
+        } else {
+            None
+        };
+
+        for v in &self.output.values {
+            let (value, op) = match v {
+                output::OutputSpec::Step => (output::Value::Usize(*step), output::Operation::First),
+                output::OutputSpec::Temp => (
+                    output::Value::Float(ke.unwrap_or(0.0) * 3.0 / self.atoms.num_atoms() as f64),
+                    output::Operation::Sum,
+                ),
+                output::OutputSpec::KineticE => (
+                    output::Value::Float(ke.unwrap_or(0.0)),
+                    output::Operation::Sum,
+                ),
+                output::OutputSpec::PotentialE => (
+                    output::Value::Float(pe.unwrap_or(0.0)),
+                    output::Operation::Sum,
+                ),
+                output::OutputSpec::TotalE => (
+                    output::Value::Float(ke.unwrap_or(0.0) + pe.unwrap_or(0.0)),
+                    output::Operation::Sum,
+                ),
+            };
+            self.domain
+                .send_to_main(msg::W2M::Output(output::OutputMessage::new(value, op)));
+        }
     }
 }
