@@ -1,10 +1,13 @@
-use jmd::{self, AtomicPotential, Integrator, UpdateSettings};
+use jmd::{self, AtomicPotential, Integrator, Lattice, UpdateSettings};
 fn run(simulation: &mut jmd::Simulation) -> Result<(), jmd::Error> {
-    let rect = jmd::region::Rect::new(0.0, 10.0, 0.0, 10.0, 0.0, 10.0);
+    let lattice = jmd::Cubic::from_density(0.8);
+    let rect = jmd::Rect::from_lattice(&lattice, [10, 10, 10]);
+
     let container = jmd::Container::from_rect(rect.clone());
     simulation.set_container(container);
 
-    simulation.atoms.add_random_atoms(&rect, 10, 0, 1.0);
+    let coords = lattice.coords_within_region(&rect, &[0.0, 0.0, 0.0]);
+    simulation.atoms.add_atoms(0, 1.0, coords);
     dbg!(&simulation.atoms.positions);
 
     let mut lj = jmd::LJCut::new(1, 2.5);

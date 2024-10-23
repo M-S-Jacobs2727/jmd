@@ -1,4 +1,6 @@
-use crate::{neighbor, region::Region, utils};
+use rand_distr::Distribution;
+
+use crate::{neighbor, region::Region, utils, Error};
 
 /// Atom properties during simulation, not including forces
 pub struct Atoms {
@@ -98,6 +100,40 @@ impl Atoms {
             self.velocities.push([0.0, 0.0, 0.0]);
             self.positions.push(region.get_random_coord())
         }
+    }
+    pub fn add_atoms(&mut self, atom_type: u32, mass: f64, coords: Vec<[f64; 3]>) {
+        let num_atoms = coords.len();
+        let atom_id = match self.ids().iter().max() {
+            Some(j) => j + 1,
+            None => 0,
+        };
+        self.ids.extend(atom_id..atom_id + num_atoms);
+        self.types.reserve(num_atoms);
+        self.positions.reserve(num_atoms);
+        self.velocities.reserve(num_atoms);
+        self.masses.reserve(num_atoms);
+        self.nlocal += num_atoms;
+
+        for i in 0..num_atoms {
+            self.types.push(atom_type);
+            self.masses.push(mass);
+            self.velocities.push([0.0, 0.0, 0.0]);
+            self.positions.push(coords[i])
+        }
+    }
+    pub fn set_temperature(&mut self, temperature: f64) -> Result<(), Error> {
+        let mut rng = rand::thread_rng();
+        let dist =
+            rand_distr::Normal::new(0.0, temperature.sqrt()).map_err(|_e| Error::OtherError)?;
+        let sqrt_ke: Vec<f64> = dist.sample_iter(&mut rng).take(self.nlocal * 3).collect();
+        for i in 0..self.nlocal {
+            self.velocities[i] = [
+                sqrt_ke[3 * i + 0] / self.masses[i].sqrt(),
+                sqrt_ke[3 * i + 1] / self.masses[i].sqrt(),
+                sqrt_ke[3 * i + 2] / self.masses[i].sqrt(),
+            ];
+        }
+        Ok(())
     }
     pub fn remove_idxs(&mut self, atom_idxs: Vec<usize>) {
         let num_local = atom_idxs.iter().filter(|&i| *i < self.nlocal).count();

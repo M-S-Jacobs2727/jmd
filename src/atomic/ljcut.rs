@@ -173,7 +173,7 @@ impl AtomicPotential for LJCut {
 
                 let r6 = r2 * r2 * r2;
 
-                energy += 2.0 * coeff.epsilon * coeff.sigma6 / r6 * (coeff.sigma6 / r6 - 1.0)
+                energy += 4.0 * coeff.epsilon * coeff.sigma6 / r6 * (coeff.sigma6 / r6 - 1.0)
                     - coeff.correction;
             }
         }

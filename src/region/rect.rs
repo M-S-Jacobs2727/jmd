@@ -1,5 +1,5 @@
 use super::Region;
-use crate::Container;
+use crate::{Container, Lattice};
 
 use rand;
 #[derive(Clone, Copy, Debug)]
@@ -41,6 +41,17 @@ impl Rect {
             yhi: container.yhi(),
             zlo: container.zlo(),
             zhi: container.zhi(),
+        }
+    }
+    pub fn from_lattice(lattice: &impl Lattice, num_cells: [usize; 3]) -> Self {
+        let lengths = lattice.cell_lengths();
+        Self {
+            xlo: -0.5 * (num_cells[0] as f64) * lengths[0],
+            xhi: 0.5 * (num_cells[0] as f64) * lengths[0],
+            ylo: -0.5 * (num_cells[1] as f64) * lengths[1],
+            yhi: 0.5 * (num_cells[1] as f64) * lengths[1],
+            zlo: -0.5 * (num_cells[2] as f64) * lengths[2],
+            zhi: 0.5 * (num_cells[2] as f64) * lengths[2],
         }
     }
     pub fn xlo(&self) -> f64 {
@@ -92,5 +103,8 @@ impl Region for Rect {
             rand::random::<f64>() * self.ly() + self.ylo,
             rand::random::<f64>() * self.lz() + self.zlo,
         ]
+    }
+    fn bounding_box(&self) -> Rect {
+        self.clone()
     }
 }
