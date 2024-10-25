@@ -51,7 +51,7 @@ pub(crate) fn forward_comm(sim: &mut Simulation) {
     recv_forward_comm(sim);
 }
 
-fn collect_comm_atoms(sim: &Simulation, direction: Direction) -> Vec<usize> {
+fn collect_comm_atoms(sim: &Simulation, direction: &Direction) -> Vec<usize> {
     let idx = direction.axis().index();
     sim.atoms
         .positions
@@ -70,7 +70,7 @@ fn collect_comm_atoms(sim: &Simulation, direction: Direction) -> Vec<usize> {
 }
 
 fn send_atoms(sim: &mut Simulation, direction: Direction) {
-    let atom_idxs = collect_comm_atoms(sim, direction.clone());
+    let atom_idxs = collect_comm_atoms(sim, &direction);
     let ids: Vec<usize> = atom_idxs.iter().map(|i| sim.atoms.ids[*i]).collect();
     sim.domain().send(Message::Idxs(ids), direction).unwrap();
 
@@ -78,7 +78,7 @@ fn send_atoms(sim: &mut Simulation, direction: Direction) {
 }
 
 fn recv_atoms(sim: &mut Simulation) {
-    let msg = sim.domain().receive().expect("Disconnect error");
+    let msg = sim.domain().receive();
     match msg {
         Message::Idxs(new_ids) => {
             let idx = sim
@@ -96,7 +96,9 @@ fn recv_atoms(sim: &mut Simulation) {
 }
 
 pub(crate) fn comm_atom_ownership(sim: &mut Simulation) {
+    // dbg!(&sim.atoms);
     send_atoms(sim, Direction::Xlo);
+    // dbg!(&sim.atoms);
     recv_atoms(sim);
 
     send_atoms(sim, Direction::Xhi);
@@ -116,8 +118,8 @@ pub(crate) fn comm_atom_ownership(sim: &mut Simulation) {
 }
 
 fn recv_reverse_comm(sim: &Simulation, forces: &mut Vec<[f64; 3]>) {
-    let id_msg = sim.domain().receive().expect("Disconnect error");
-    let force_msg = sim.domain().receive().expect("Disconnect error");
+    let id_msg = sim.domain().receive();
+    let force_msg = sim.domain().receive();
     match (id_msg, force_msg) {
         (Message::Idxs(ids), Message::Float3(new_forces)) => {
             accumulate_forces(sim, &ids, &new_forces, forces)
@@ -130,11 +132,11 @@ fn recv_reverse_comm(sim: &Simulation, forces: &mut Vec<[f64; 3]>) {
 }
 
 fn recv_forward_comm(sim: &mut Simulation) {
-    let id_msg = sim.domain().receive().expect("Disconnect error");
-    let type_msg = sim.domain().receive().expect("Disconnect error");
-    let mass_msg = sim.domain().receive().expect("Disconnect error");
-    let pos_msg = sim.domain().receive().expect("Disconnect error");
-    let vel_msg = sim.domain().receive().expect("Disconnect error");
+    let id_msg = sim.domain().receive();
+    let type_msg = sim.domain().receive();
+    let mass_msg = sim.domain().receive();
+    let pos_msg = sim.domain().receive();
+    let vel_msg = sim.domain().receive();
     match (id_msg, type_msg, mass_msg, pos_msg, vel_msg) {
         (
             Message::Idxs(ids),

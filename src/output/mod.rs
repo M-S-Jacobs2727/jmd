@@ -26,6 +26,18 @@ pub enum OutputSpec {
     PotentialE,
     TotalE,
 }
+impl Display for OutputSpec {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            OutputSpec::Step => "Step",
+            OutputSpec::Temp => "Temp",
+            OutputSpec::KineticE => "KineticE",
+            OutputSpec::PotentialE => "PotentialE",
+            OutputSpec::TotalE => "TotalE",
+        };
+        String::from(s).fmt(f)
+    }
+}
 
 #[derive(Clone)]
 pub struct Output {

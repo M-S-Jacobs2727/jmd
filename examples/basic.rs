@@ -8,7 +8,7 @@ fn run(simulation: &mut jmd::Simulation) -> Result<(), jmd::Error> {
 
     let coords = lattice.coords_within_region(&rect, &[0.0, 0.0, 0.0]);
     simulation.atoms.add_atoms(0, 1.0, coords);
-    dbg!(&simulation.atoms.positions);
+    dbg!(simulation.atoms.num_atoms());
 
     simulation.atoms.set_temperature(3.0)?;
 
@@ -17,7 +17,8 @@ fn run(simulation: &mut jmd::Simulation) -> Result<(), jmd::Error> {
     lj.set_coeff(0.into(), 0.into(), 1.0, 1.0, 2.5)?;
     simulation.set_atomic_potential(lj);
 
-    let mut nl = jmd::NeighborList::new(simulation.container(), 1.75, force_distance, 0.3);
+    let mut nl = jmd::NeighborList::new(simulation.container(), force_distance, 0.3);
+    dbg!(&nl);
     nl.set_update_settings(UpdateSettings::new(10, 0, true));
     simulation.set_neighbor_list(nl);
 

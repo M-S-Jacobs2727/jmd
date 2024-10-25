@@ -7,6 +7,7 @@ use crate::{
     Atoms, Axis, Container, Error, NeighborList, OutputSpec, BC,
 };
 type ComputeVec = KeyedVec<String, Box<dyn compute::Compute>>;
+
 pub struct Simulation<'a> {
     pub atoms: Atoms,
     container: Container,
@@ -21,7 +22,7 @@ pub struct Simulation<'a> {
 impl<'a> Simulation<'a> {
     pub fn new() -> Self {
         let container = Container::new(0., 10., 0.0, 10.0, 0.0, 10.0, BC::PP, BC::PP, BC::PP);
-        let neighbor_list = NeighborList::new(&container, 1.0, 1.0, 1.0);
+        let neighbor_list = NeighborList::new(&container, 1.0, 1.0);
         Self {
             atoms: Atoms::new(),
             container,
@@ -75,9 +76,7 @@ impl<'a> Simulation<'a> {
         self.atomic_potential = Box::new(atomic_potential);
         let force_distance = self.atomic_potential.cutoff_distance();
         let skin_distance = 1.0;
-        let bin_size = (force_distance + skin_distance) * 0.5;
-        self.neighbor_list =
-            NeighborList::new(self.container(), bin_size, force_distance, skin_distance);
+        self.neighbor_list = NeighborList::new(self.container(), force_distance, skin_distance);
     }
     pub fn set_neighbor_list(&mut self, neighbor_list: NeighborList) {
         self.neighbor_list = neighbor_list;
@@ -132,7 +131,9 @@ impl<'a> Simulation<'a> {
     }
 
     pub(crate) fn build_neighbor_list(&mut self) {
-        dbg!(self.atoms.positions());
+        if !self.neighbor_list().is_built() {
+            self.neighbor_list.update(self.atoms.positions());
+        }
         self.wrap_pbs();
         comm::comm_atom_ownership(self);
         self.neighbor_list.update(self.atoms.positions());
@@ -213,5 +214,9 @@ impl<'a> Simulation<'a> {
                 }
             });
         }
+    }
+
+    pub(crate) fn initial_output(&self) {
+        self.domain().send_to_main_once(msg::W2M::InitialOutput);
     }
 }

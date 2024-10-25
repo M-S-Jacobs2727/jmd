@@ -1,4 +1,4 @@
-use crate::Container;
+use crate::{utils::indices::Index, Container};
 
 /// Neighbor list grid of bins
 #[derive(Debug)]
@@ -23,14 +23,14 @@ impl Grid {
             min_box_length
         );
         let lo_corner = [
-            container.xlo() - cutoff_distance,
-            container.ylo() - cutoff_distance,
-            container.zlo() - cutoff_distance,
+            container.xlo() - 2.0 * cutoff_distance,
+            container.ylo() - 2.0 * cutoff_distance,
+            container.zlo() - 2.0 * cutoff_distance,
         ];
         let num_bins: [usize; 3] = [
-            ((container.lx() + 2.0 * cutoff_distance) / bin_size).ceil() as usize,
-            ((container.ly() + 2.0 * cutoff_distance) / bin_size).ceil() as usize,
-            ((container.lz() + 2.0 * cutoff_distance) / bin_size).ceil() as usize,
+            ((container.lx() + 4.0 * cutoff_distance) / bin_size).ceil() as usize,
+            ((container.ly() + 4.0 * cutoff_distance) / bin_size).ceil() as usize,
+            ((container.lz() + 4.0 * cutoff_distance) / bin_size).ceil() as usize,
         ];
         Self {
             lo_corner,
@@ -73,22 +73,33 @@ impl Grid {
     pub fn bin_idx_from_3d_idx(&self, inds: &[i32; 3]) -> usize {
         assert!(
             inds[0] >= 0 && inds[1] >= 0 && inds[2] >= 0,
-            "3D bin indices ({}, {}, {}) should be positive",
-            inds[0],
-            inds[1],
-            inds[2]
+            "3D bin indices ({:?}) should be positive",
+            inds
         );
         (inds[0] as usize) * self.num_bins[1] * self.num_bins[2]
             + (inds[1] as usize) * self.num_bins[2]
             + (inds[2] as usize)
     }
-    pub fn coord_to_3d_idx(&self, coord: &[f64; 3]) -> [i32; 3] {
-        let mut inds: [i32; 3] = [0, 0, 0];
-        let num_bins = self.num_bins();
-        for i in 0..3 {
-            inds[i] = ((((coord[i] - self.lo_corner[i]) / self.bin_size).floor() as i32)
-                % num_bins[i] as i32) as i32;
-        }
-        inds
+    pub fn coord_to_index(&self, coord: &[f64; 3]) -> Index {
+        let inds = [
+            ((coord[0] - self.lo_corner[0]) / self.bin_size).floor(),
+            ((coord[1] - self.lo_corner[1]) / self.bin_size).floor(),
+            ((coord[2] - self.lo_corner[2]) / self.bin_size).floor(),
+        ];
+        assert!(
+            inds[0] >= 0.0 && inds[1] >= 0.0 && inds[2] >= 0.0,
+            "Coordinates ({:?}) should be within grid ({:?}, {:?}",
+            inds,
+            self.lo_corner,
+            [
+                self.lo_corner[0] + self.num_bins[0] as f64 * self.bin_size,
+                self.lo_corner[1] + self.num_bins[1] as f64 * self.bin_size,
+                self.lo_corner[2] + self.num_bins[2] as f64 * self.bin_size,
+            ]
+        );
+        Index::from_3d(
+            &[inds[0] as usize, inds[1] as usize, inds[2] as usize],
+            &self.num_bins(),
+        )
     }
 }

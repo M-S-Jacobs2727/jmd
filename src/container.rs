@@ -6,6 +6,7 @@ use crate::{region::Rect, Axis};
 /// F: Fixed boundary
 /// S: Shrink-wrapped boundary
 /// M: Shrink-wrapped boundary with a minimum
+#[derive(Debug)]
 pub enum BC {
     PP,
     FF,
@@ -28,6 +29,7 @@ impl BC {
 }
 
 /// Simulation box, represented by x, y, and z Bounds
+#[derive(Debug)]
 pub struct Container {
     rect: Rect,
     bc: [BC; 3],

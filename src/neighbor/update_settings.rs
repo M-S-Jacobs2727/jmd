@@ -1,4 +1,5 @@
 /// Settings for computing and updating a neighbor list
+#[derive(Debug)]
 pub struct UpdateSettings {
     pub every: usize,
     pub delay: usize,

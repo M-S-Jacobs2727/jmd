@@ -2,6 +2,7 @@ use crate::region::Region;
 
 use super::Lattice;
 
+#[derive(Debug)]
 pub struct Cubic {
     a: f64,
 }
@@ -35,9 +36,9 @@ impl Lattice for Cubic {
         let bblo = bounding_box.lo();
         let bbhi = bounding_box.hi();
         let lo = [
-            ((origin[0] - bblo[0]) / self.a).floor() * self.a,
-            ((origin[1] - bblo[1]) / self.a).floor() * self.a,
-            ((origin[2] - bblo[2]) / self.a).floor() * self.a,
+            ((bblo[0] - origin[0]) / self.a).floor() * self.a,
+            ((bblo[1] - origin[1]) / self.a).floor() * self.a,
+            ((bblo[2] - origin[2]) / self.a).floor() * self.a,
         ];
         let nlattice = [
             ((bbhi[0] - lo[0]) / self.a).floor() as usize,

@@ -21,6 +21,7 @@ pub enum W2M {
     Sender(Option<mpsc::Sender<Message>>, usize),
     ProcDims([usize; 3]),
     SetupOutput(Vec<OutputSpec>),
+    InitialOutput,
 }
 
 /// Manager-to-Worker messages

@@ -97,7 +97,7 @@ impl Jmd {
         }
 
         for v in values {
-            print!("\t{}", v);
+            print!("{}\t", v);
         }
         println!();
     }
@@ -118,6 +118,7 @@ impl Jmd {
             msg::W2M::Sender(tx, idx) => self.threads[idx].tx.send(msg::M2W::Sender(tx)).unwrap(),
             msg::W2M::SetupOutput(specs) => *output_spec = specs,
             msg::W2M::Output(id, value) => self.output(id, value, &output_spec),
+            msg::W2M::InitialOutput => self.initial_output(output_spec),
             _ => {}
         };
         Ok(())
@@ -154,5 +155,12 @@ impl Jmd {
             thread.tx.send(msg::M2W::Run(f)).unwrap();
         }
         self.manage_comm()
+    }
+
+    fn initial_output(&self, output_spec: &Vec<OutputSpec>) {
+        for spec in output_spec {
+            print!("{}\t", spec)
+        }
+        println!();
     }
 }

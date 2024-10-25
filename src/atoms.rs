@@ -3,6 +3,7 @@ use rand_distr::Distribution;
 use crate::{neighbor, region::Region, utils, Error};
 
 /// Atom properties during simulation, not including forces
+#[derive(Debug)]
 pub struct Atoms {
     pub ids: Vec<usize>,
     pub types: Vec<u32>,
@@ -60,7 +61,7 @@ impl Atoms {
         let bin_indices = self
             .positions
             .iter()
-            .map(|coord| bins.bin_idx_from_3d_idx(&bins.coord_to_3d_idx(coord)))
+            .map(|coord| bins.coord_to_index(coord).idx())
             .collect();
         let sort_indices = utils::get_sort_indices(&bin_indices);
 
@@ -73,7 +74,7 @@ impl Atoms {
         return self
             .positions
             .iter()
-            .map(|coord| bins.bin_idx_from_3d_idx(&bins.coord_to_3d_idx(coord)))
+            .map(|coord| bins.coord_to_index(coord).idx())
             .collect();
     }
     pub fn add_random_atoms(

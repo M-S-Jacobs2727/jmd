@@ -43,6 +43,8 @@ impl Verlet {
 
 impl Integrator for Verlet {
     fn run(&self, simulation: &mut Simulation, num_steps: usize) {
+        simulation.initial_output();
+
         simulation.forward_comm();
         simulation.build_neighbor_list();
         let mut forces = simulation.compute_forces();
@@ -62,7 +64,7 @@ impl Integrator for Verlet {
             self.increment_velocity_halfstep(simulation, &forces);
 
             simulation.check_do_output(&step);
-            dbg!(&simulation.atoms.positions);
+            // dbg!(&simulation.atoms.positions);
         }
     }
 }

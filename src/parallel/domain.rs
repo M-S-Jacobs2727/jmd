@@ -273,8 +273,8 @@ impl<'a> Domain<'a> {
             .filter(|&&p| (*p).is_some())
             .count()
     }
-    pub fn receive(&self) -> Result<msg::Message, mpsc::RecvError> {
-        self.receiver.recv()
+    pub fn receive(&self) -> msg::Message {
+        self.receiver.recv().expect("Disconnect error")
     }
     pub fn send(
         &self,
@@ -330,6 +330,12 @@ impl<'a> Domain<'a> {
             None
         } else {
             Some(Index::from_3d(&idx, &bounds))
+        }
+    }
+
+    pub(crate) fn send_to_main_once(&self, message: msg::W2M) {
+        if self.proc_location.idx() == 0 {
+            self.send_to_main(message);
         }
     }
 }
