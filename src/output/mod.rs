@@ -1,5 +1,23 @@
 use std::{fmt::Display, ops::AddAssign, thread};
 
+pub enum Cumulation {
+    Match,
+    Sum,
+    Max,
+    Min,
+}
+pub struct OutputFormat {
+    name: String,
+    cumulation: Cumulation,
+}
+impl OutputFormat {
+    pub fn new(name: &str, cumulation: Cumulation) -> Self {
+        Self {
+            name: String::from(name),
+            cumulation,
+        }
+    }
+}
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum OutputSpec {
     Step,

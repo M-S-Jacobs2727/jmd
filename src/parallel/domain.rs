@@ -52,7 +52,7 @@ pub struct Domain<'a> {
     proc_location: Index,
 }
 impl<'a> Domain<'a> {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let neighbor_procs: AdjacentProcs = AdjacentProcs::new();
         let (my_sender, receiver) = mpsc::channel();
 
@@ -65,7 +65,7 @@ impl<'a> Domain<'a> {
             proc_location: Index::new(),
         }
     }
-    pub fn init(&mut self, container: &Container, worker: Box<&'a Worker>) {
+    pub(crate) fn init(&mut self, container: &Container, worker: Box<&'a Worker>) {
         self.worker = Some(worker);
 
         let num_threads = self.thread_ids().len();
@@ -89,10 +89,10 @@ impl<'a> Domain<'a> {
         self.setup_neighbor(Direction::Zlo, container);
         self.setup_neighbor(Direction::Zhi, container);
     }
-    pub fn subdomain(&self) -> &Rect {
+    pub(crate) fn subdomain(&self) -> &Rect {
         &self.subdomain
     }
-    pub fn worker(&self) -> &Box<&'a Worker> {
+    pub(crate) fn worker(&self) -> &Box<&'a Worker> {
         self.worker.as_ref().expect("Must init")
     }
     fn setup_neighbor(&mut self, direction: Direction, container: &Container) {

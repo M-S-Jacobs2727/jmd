@@ -1,4 +1,5 @@
 mod adjacent_procs;
+pub(crate) mod comm;
 mod domain;
 pub(crate) mod message;
 mod worker;

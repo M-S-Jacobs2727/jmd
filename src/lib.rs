@@ -3,9 +3,9 @@
 // TODO: implement ndarray?
 // TODO: check best implementation of "atom has moved half the bin size"
 
-mod atomic;
+pub mod atomic;
 mod atoms;
-mod compute;
+pub mod compute;
 mod container;
 mod error;
 mod integrators;
@@ -18,9 +18,7 @@ mod region;
 mod simulation;
 mod utils;
 
-pub use atomic::*;
 pub use atoms::Atoms;
-pub use compute::*;
 pub use container::{Container, BC};
 pub use error::Error;
 pub use integrators::*;

@@ -1,22 +1,23 @@
 use crate::{
-    output,
+    atomic, compute, output,
     parallel::{
-        message::{self as msg, Message},
+        comm,
+        message::{self as msg},
         Domain, Worker,
     },
-    region::{Rect, Region},
-    AtomicPotential, Atoms, Axis, Container, Direction, Error, NeighborList, None_, BC,
+    Atoms, Axis, Container, Error, NeighborList, OutputSpec, BC,
 };
 
 pub struct Simulation<'a> {
     pub atoms: Atoms,
     container: Container,
-    atomic_potential: Box<dyn AtomicPotential>,
+    atomic_potential: Box<dyn atomic::AtomicPotential>,
     neighbor_list: NeighborList,
     domain: Domain<'a>,
     output: output::Output,
     nlocal: usize,
     pos_at_prev_neigh_build: Vec<[f64; 3]>,
+    computes: Vec<Box<dyn compute::Compute>>,
 }
 impl<'a> Simulation<'a> {
     pub fn new() -> Self {
@@ -25,20 +26,26 @@ impl<'a> Simulation<'a> {
         Self {
             atoms: Atoms::new(),
             container,
-            atomic_potential: Box::new(None_::new()),
+            atomic_potential: Box::new(atomic::None_::new()),
             neighbor_list,
             domain: Domain::new(),
             output: output::Output::new(),
             nlocal: 0,
             pos_at_prev_neigh_build: Vec::new(),
+            computes: Vec::new(),
         }
+    }
+
+    /// Initializes the simulation from a worker thread
+    pub(crate) fn init(&mut self, worker: Box<&'a Worker>) {
+        self.domain.init(&self.container, worker);
     }
 
     // Getters
     pub fn container(&self) -> &Container {
         &self.container
     }
-    pub fn atomic_potential(&self) -> &Box<dyn crate::AtomicPotential> {
+    pub fn atomic_potential(&self) -> &Box<dyn atomic::AtomicPotential> {
         &self.atomic_potential
     }
     pub fn neighbor_list(&self) -> &NeighborList {
@@ -50,6 +57,9 @@ impl<'a> Simulation<'a> {
     pub fn nlocal(&self) -> usize {
         self.nlocal
     }
+    pub fn computes(&self) -> &Vec<Box<dyn compute::Compute>> {
+        &self.computes
+    }
 
     // Setters
     pub fn set_atom_types(&mut self, atom_types: usize) -> Result<(), Error> {
@@ -59,7 +69,10 @@ impl<'a> Simulation<'a> {
         self.container = container;
         self.domain.reset_subdomain(&self.container);
     }
-    pub fn set_atomic_potential(&mut self, atomic_potential: impl AtomicPotential + 'static) {
+    pub fn set_atomic_potential(
+        &mut self,
+        atomic_potential: impl atomic::AtomicPotential + 'static,
+    ) {
         self.atomic_potential = Box::new(atomic_potential);
         let force_distance = self.atomic_potential.cutoff_distance();
         let skin_distance = 1.0;
@@ -75,23 +88,33 @@ impl<'a> Simulation<'a> {
     }
     pub fn set_output(&mut self, output: output::Output) {
         self.output = output.clone();
+        for o in &output.values {
+            match o {
+                OutputSpec::Step => {}
+                OutputSpec::KineticE => self.add_compute(compute::KineticEnergy {}),
+                OutputSpec::PotentialE => self.add_compute(compute::PotentialEnergy {}),
+                OutputSpec::Temp => self.add_compute(compute::Temperature {}),
+                OutputSpec::TotalE => self.add_compute(compute::TotalEnergy {}),
+            }
+        }
         self.domain
             .send_to_main(msg::W2M::SetupOutput(output.values));
     }
-
-    fn compute_local_pe(&self) -> f64 {
-        self.atomic_potential.compute_potential_energy(self)
+    pub(crate) fn increment_nlocal(&mut self) {
+        self.nlocal += 1;
     }
-    fn compute_local_ke(&self) -> f64 {
-        0.5 * self
-            .atoms
-            .velocities
-            .iter()
-            .zip(self.atoms.masses.iter())
-            .take(self.nlocal)
-            .map(|(v, m)| m * (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]))
-            .reduce(|acc, t| acc + t)
-            .unwrap_or(0.0)
+    pub fn add_compute(&mut self, compute: impl compute::Compute + 'static) {
+        self.computes.push(Box::new(compute));
+    }
+    pub fn add_computes(&mut self, mut computes: Vec<Box<dyn compute::Compute + 'static>>) {
+        self.computes.append(&mut computes);
+    }
+
+    pub(crate) fn forward_comm(&mut self) {
+        comm::forward_comm(self);
+    }
+    pub(crate) fn reverse_comm(&self, forces: &mut Vec<[f64; 3]>) {
+        comm::reverse_comm(self, forces);
     }
 
     pub(crate) fn compute_forces(&self) -> Vec<[f64; 3]> {
@@ -115,324 +138,12 @@ impl<'a> Simulation<'a> {
     pub(crate) fn build_neighbor_list(&mut self) {
         dbg!(self.atoms.positions());
         self.wrap_pbs();
-        self.comm_atom_ownership();
+        comm::comm_atom_ownership(self);
         self.neighbor_list.update(self.atoms.positions());
         self.pos_at_prev_neigh_build = self.atoms.positions.clone();
     }
 
-    pub(crate) fn reverse_comm(&self, forces: &mut Vec<[f64; 3]>) {
-        let mut sent_ids: Vec<usize> = Vec::new();
-
-        // z-direction
-        let mut ids = self.send_reverse_comm(forces, Direction::Zhi);
-        sent_ids.append(&mut ids);
-        self.recv_reverse_comm(forces);
-
-        let mut ids = self.send_reverse_comm(forces, Direction::Zlo);
-        sent_ids.append(&mut ids);
-        self.recv_reverse_comm(forces);
-
-        // y-direction
-        let mut ids = self.send_reverse_comm(forces, Direction::Yhi);
-        sent_ids.append(&mut ids);
-        self.recv_reverse_comm(forces);
-
-        let mut ids = self.send_reverse_comm(forces, Direction::Ylo);
-        sent_ids.append(&mut ids);
-        self.recv_reverse_comm(forces);
-
-        // x-direction
-        let mut ids = self.send_reverse_comm(forces, Direction::Xhi);
-        sent_ids.append(&mut ids);
-        self.recv_reverse_comm(forces);
-
-        let mut ids = self.send_reverse_comm(forces, Direction::Xlo);
-        sent_ids.append(&mut ids);
-        self.recv_reverse_comm(forces);
-    }
-
-    pub(crate) fn forward_comm(&mut self) {
-        // x-direction
-        self.send_forward_comm(Direction::Xlo);
-        self.recv_forward_comm();
-        self.send_forward_comm(Direction::Xhi);
-        self.recv_forward_comm();
-
-        // y-direction
-        self.send_forward_comm(Direction::Ylo);
-        self.recv_forward_comm();
-        self.send_forward_comm(Direction::Yhi);
-        self.recv_forward_comm();
-
-        // z-direction
-        self.send_forward_comm(Direction::Zlo);
-        self.recv_forward_comm();
-        self.send_forward_comm(Direction::Zhi);
-        self.recv_forward_comm();
-    }
-
-    /// Initializes the simulation from a worker thread
-    pub(crate) fn init(&mut self, worker: Box<&'a Worker>) {
-        self.domain.init(&self.container, worker);
-    }
-
-    fn wrap_pbs(&mut self) {
-        if self.container.is_periodic(Axis::X) {
-            self.atoms.positions.iter_mut().for_each(|p| {
-                if p[0] < self.container.xlo() {
-                    p[0] += self.container.lx();
-                } else if p[0] > self.container.xhi() {
-                    p[0] -= self.container.lx();
-                }
-            });
-        }
-        if self.container.is_periodic(Axis::Y) {
-            self.atoms.positions.iter_mut().for_each(|p| {
-                if p[1] < self.container.ylo() {
-                    p[1] += self.container.ly();
-                } else if p[1] > self.container.yhi() {
-                    p[1] -= self.container.ly();
-                }
-            });
-        }
-        if self.container.is_periodic(Axis::Z) {
-            self.atoms.positions.iter_mut().for_each(|p| {
-                if p[2] < self.container.zlo() {
-                    p[2] += self.container.lz();
-                } else if p[2] > self.container.zhi() {
-                    p[2] -= self.container.lz();
-                }
-            });
-        }
-    }
-
-    fn collect_comm_atoms(&self, direction: Direction) -> Vec<usize> {
-        let idx = direction.axis().index();
-        self.atoms
-            .positions
-            .iter()
-            .enumerate()
-            .filter_map(|(i, p)| {
-                if direction.is_lo() && p[idx] < self.domain.subdomain().lo()[idx] {
-                    Some(i)
-                } else if !direction.is_lo() && p[idx] > self.domain.subdomain().hi()[idx] {
-                    Some(i)
-                } else {
-                    None
-                }
-            })
-            .collect()
-    }
-
-    fn send_atoms(&mut self, direction: Direction) {
-        let atom_idxs = self.collect_comm_atoms(direction.clone());
-        let ids: Vec<usize> = atom_idxs.iter().map(|i| self.atoms.ids[*i]).collect();
-        self.domain.send(Message::Idxs(ids), direction).unwrap();
-
-        self.atoms.remove_idxs(atom_idxs);
-    }
-
-    fn recv_atoms(&mut self) {
-        let msg = self.domain.receive().expect("Disconnect error");
-        match msg {
-            Message::Idxs(new_ids) => {
-                let idx = self
-                    .atoms
-                    .ids
-                    .iter()
-                    .position(|id| new_ids.contains(id))
-                    .expect("Missing atom");
-                if self.container.rect().contains(&self.atoms.positions[idx]) {
-                    self.nlocal += 1;
-                }
-            }
-            _ => panic!("Invalid message"),
-        };
-    }
-
-    fn comm_atom_ownership(&mut self) {
-        self.send_atoms(Direction::Xlo);
-        self.recv_atoms();
-
-        self.send_atoms(Direction::Xhi);
-        self.recv_atoms();
-
-        self.send_atoms(Direction::Ylo);
-        self.recv_atoms();
-
-        self.send_atoms(Direction::Yhi);
-        self.recv_atoms();
-
-        self.send_atoms(Direction::Zlo);
-        self.recv_atoms();
-
-        self.send_atoms(Direction::Zhi);
-        self.recv_atoms();
-    }
-
-    fn recv_reverse_comm(&self, forces: &mut Vec<[f64; 3]>) {
-        let id_msg = self.domain.receive().expect("Disconnect error");
-        let force_msg = self.domain.receive().expect("Disconnect error");
-        match (id_msg, force_msg) {
-            (Message::Idxs(ids), Message::Float3(new_forces)) => {
-                self.accumulate_forces(&ids, &new_forces, forces)
-            }
-            (Message::Float3(new_forces), Message::Idxs(ids)) => {
-                self.accumulate_forces(&ids, &new_forces, forces)
-            }
-            _ => panic!("Invalid communication"),
-        }
-    }
-
-    fn recv_forward_comm(&mut self) {
-        let id_msg = self.domain.receive().expect("Disconnect error");
-        let type_msg = self.domain.receive().expect("Disconnect error");
-        let mass_msg = self.domain.receive().expect("Disconnect error");
-        let pos_msg = self.domain.receive().expect("Disconnect error");
-        let vel_msg = self.domain.receive().expect("Disconnect error");
-        match (id_msg, type_msg, mass_msg, pos_msg, vel_msg) {
-            (
-                Message::Idxs(ids),
-                Message::Types(types),
-                Message::Float(masses),
-                Message::Float3(positions),
-                Message::Float3(velocities),
-            ) => {
-                self.update_ghost_atoms(ids, types, masses, positions, velocities);
-            }
-            _ => panic!("Invalid message"),
-        };
-    }
-
-    fn atoms_moved_too_far(&mut self) -> bool {
-        if self.atoms.num_atoms() == 0 {
-            return false;
-        }
-        let half_skin_dist = self.neighbor_list.skin_distance() * 0.5;
-        let max_dist_sq = self
-            .pos_at_prev_neigh_build
-            .iter()
-            .zip(self.atoms.positions().iter())
-            .map(|(old, new)| {
-                let [dx, dy, dz] = [new[0] - old[0], new[1] - old[1], new[2] - old[2]];
-                dx * dx + dy * dy + dz * dz
-            })
-            .reduce(f64::max)
-            .unwrap();
-
-        max_dist_sq > half_skin_dist * half_skin_dist
-    }
-
-    fn gather_ghost_ids(&self, rect: Rect) -> Vec<usize> {
-        self.atoms
-            .ids
-            .iter()
-            .skip(self.nlocal)
-            .zip(self.atoms.positions.iter())
-            .filter(|(_id, pos)| rect.contains(pos))
-            .map(|(id, _pos)| *id)
-            .collect()
-    }
-
-    fn gather_owned_idxs(&self, rect: Rect) -> Vec<usize> {
-        self.atoms
-            .positions
-            .iter()
-            .take(self.nlocal)
-            .enumerate()
-            .filter(|(_id, pos)| rect.contains(pos))
-            .map(|(id, _pos)| id)
-            .collect()
-    }
-
-    fn accumulate_forces(
-        &self,
-        ids: &Vec<usize>,
-        forces: &Vec<[f64; 3]>,
-        cur_forces: &mut Vec<[f64; 3]>,
-    ) {
-        for i in 0..self.atoms.num_atoms() {
-            let opt = ids.iter().position(|id| *id == self.atoms.ids[i]);
-            if let Some(j) = opt {
-                cur_forces[i][0] += forces[j][0];
-                cur_forces[i][1] += forces[j][1];
-                cur_forces[i][2] += forces[j][2];
-            }
-        }
-    }
-
-    fn send_reverse_comm(&self, forces: &Vec<[f64; 3]>, direction: Direction) -> Vec<usize> {
-        let ids =
-            self.gather_ghost_ids(self.domain.get_outer_rect(&direction, &self.neighbor_list));
-        let mut send_forces: Vec<[f64; 3]> = Vec::new();
-        send_forces.reserve(ids.len());
-
-        for id in &ids {
-            let j = self
-                .atoms
-                .ids
-                .iter()
-                .position(|i| *i == *id)
-                .expect("Should exist");
-
-            send_forces.push(forces[j]);
-        }
-
-        self.domain
-            .send(Message::Idxs(ids.clone()), direction)
-            .expect("Disconnect error");
-        self.domain
-            .send(Message::Float3(send_forces), direction)
-            .expect("Disconnect error");
-        ids
-    }
-
-    fn send_forward_comm(&self, direction: Direction) {
-        let idxs =
-            self.gather_owned_idxs(self.domain.get_inner_rect(&direction, &self.neighbor_list));
-        fn gather<T: Copy>(idxs: &Vec<usize>, vec: &Vec<T>) -> Vec<T> {
-            idxs.iter().map(|i| vec[*i]).collect()
-        }
-        let send = |m| self.domain.send(m, direction).expect("Disconnect error");
-
-        let types: Vec<u32> = gather(&idxs, &self.atoms.types);
-        let masses: Vec<f64> = gather(&idxs, &self.atoms.masses);
-        let positions: Vec<[f64; 3]> = gather(&idxs, &self.atoms.positions);
-        let velocities: Vec<[f64; 3]> = gather(&idxs, &self.atoms.velocities);
-
-        send(Message::Idxs(idxs));
-        send(Message::Types(types));
-        send(Message::Float(masses));
-        send(Message::Float3(positions));
-        send(Message::Float3(velocities));
-    }
-
-    fn update_ghost_atoms(
-        &mut self,
-        mut ids: Vec<usize>,
-        mut types: Vec<u32>,
-        mut masses: Vec<f64>,
-        mut positions: Vec<[f64; 3]>,
-        mut velocities: Vec<[f64; 3]>,
-    ) {
-        assert_eq!(ids.len(), types.len(), "Invalid communication");
-        assert_eq!(ids.len(), masses.len(), "Invalid communication");
-        assert_eq!(ids.len(), positions.len(), "Invalid communication");
-        assert_eq!(ids.len(), velocities.len(), "Invalid communication");
-
-        self.atoms.ids.resize(self.atoms.nlocal, 0);
-        self.atoms.types.resize(self.atoms.nlocal, 0);
-        self.atoms.masses.resize(self.atoms.nlocal, 0.0);
-        self.atoms.positions.resize(self.atoms.nlocal, [0.0; 3]);
-        self.atoms.velocities.resize(self.atoms.nlocal, [0.0; 3]);
-
-        self.atoms.ids.append(&mut ids);
-        self.atoms.types.append(&mut types);
-        self.atoms.masses.append(&mut masses);
-        self.atoms.positions.append(&mut positions);
-        self.atoms.velocities.append(&mut velocities);
-    }
-
+    // TODO: Move to output
     pub(crate) fn check_do_output(&self, step: &usize) {
         if step % self.output.every != 0 {
             return;
@@ -477,6 +188,57 @@ impl<'a> Simulation<'a> {
             };
             self.domain
                 .send_to_main(msg::W2M::Output(output::OutputMessage::new(value, op)));
+        }
+    }
+
+    fn atoms_moved_too_far(&self) -> bool {
+        let half_skin_dist = self.neighbor_list.skin_distance() * 0.5;
+        let opt = self
+            .pos_at_prev_neigh_build
+            .iter()
+            .zip(self.atoms.positions().iter())
+            .map(|(old, new)| {
+                let [dx, dy, dz] = [new[0] - old[0], new[1] - old[1], new[2] - old[2]];
+                dx * dx + dy * dy + dz * dz
+            })
+            .reduce(f64::max);
+
+        match opt {
+            Some(max_dist_sq) => max_dist_sq > half_skin_dist * half_skin_dist,
+            None => false,
+        }
+    }
+
+    fn wrap_pbs(&mut self) {
+        if self.container().is_periodic(Axis::X) {
+            let [lo, hi] = [self.container().xlo(), self.container().xhi()];
+            self.atoms.positions.iter_mut().for_each(|p| {
+                if p[0] < lo {
+                    p[0] += hi - lo;
+                } else if p[0] > hi {
+                    p[0] -= hi - lo;
+                }
+            });
+        }
+        if self.container().is_periodic(Axis::Y) {
+            let [lo, hi] = [self.container().ylo(), self.container().yhi()];
+            self.atoms.positions.iter_mut().for_each(|p| {
+                if p[1] < lo {
+                    p[1] += hi - lo;
+                } else if p[1] > hi {
+                    p[1] -= hi - lo;
+                }
+            });
+        }
+        if self.container().is_periodic(Axis::Z) {
+            let [lo, hi] = [self.container().zlo(), self.container().zhi()];
+            self.atoms.positions.iter_mut().for_each(|p| {
+                if p[2] < lo {
+                    p[2] += hi - lo;
+                } else if p[2] > hi {
+                    p[2] -= hi - lo;
+                }
+            });
         }
     }
 }
