@@ -10,6 +10,8 @@ fn run(simulation: &mut jmd::Simulation) -> Result<(), jmd::Error> {
     simulation.atoms.add_atoms(0, 1.0, coords);
     dbg!(&simulation.atoms.positions);
 
+    simulation.atoms.set_temperature(3.0)?;
+
     let mut lj = jmd::atomic::LJCut::new(1, 2.5);
     let force_distance = lj.cutoff_distance();
     lj.set_coeff(0.into(), 0.into(), 1.0, 1.0, 2.5)?;
