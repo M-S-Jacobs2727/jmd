@@ -1,9 +1,6 @@
 use std::{sync::mpsc, thread};
 
-use crate::{
-    output::{OutputMessage, OutputSpec},
-    Atoms, Container, Error, Simulation,
-};
+use crate::{compute::ComputeValue, output::OutputSpec, Atoms, Container, Error, Simulation};
 
 /// Message between procs communicating atom info
 pub enum Message {
@@ -18,7 +15,7 @@ pub enum Message {
 pub enum W2M {
     Error(Error),
     Complete,
-    Output(OutputMessage),
+    Output(thread::ThreadId, ComputeValue),
     Dump(Atoms, Container),
     Id(thread::ThreadId),
     Sender(Option<mpsc::Sender<Message>>, usize),

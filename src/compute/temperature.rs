@@ -3,7 +3,7 @@ use crate::{
     Simulation,
 };
 
-use super::{kinetic_energy::compute_local_ke, Compute, ComputeValue};
+use super::{compute_local_ke, Compute, ComputeValue};
 
 pub struct Temperature {}
 

@@ -1,6 +1,7 @@
 use std::thread;
 use std::{sync::mpsc, time::Duration};
 
+use crate::compute::ComputeValue;
 use crate::{output::*, parallel::message as msg, parallel::Worker, Error, Simulation};
 
 struct ThreadContainer {
@@ -53,27 +54,27 @@ impl Jmd {
     fn receive(&self) -> msg::W2M {
         self.rx.recv().expect("All procs diconnected")
     }
-    fn output(&self, message: OutputMessage, output_spec: &Vec<OutputSpec>) {
+    fn output(&self, id: thread::ThreadId, value: ComputeValue, output_spec: &Vec<OutputSpec>) {
         let num_messages_expected = self.threads.len() * output_spec.len();
-        let mut values: Vec<Value> = output_spec
+        let mut values: Vec<ComputeValue> = output_spec
             .iter()
             .map(|s| match s {
-                OutputSpec::Step => Value::Usize(0),
+                OutputSpec::Step => ComputeValue::Usize(0),
                 OutputSpec::KineticE
                 | OutputSpec::PotentialE
                 | OutputSpec::Temp
-                | OutputSpec::TotalE => Value::Float(0.0),
+                | OutputSpec::TotalE => ComputeValue::Float(0.0),
             })
             .collect();
 
         let mut num_messages_per_thread: Vec<usize> = Vec::new();
         num_messages_per_thread.resize(self.threads.len(), 0);
 
-        let mut handle_output_message = |message: OutputMessage| {
+        let mut handle_output_message = |id: thread::ThreadId, value: ComputeValue| {
             let idx = self
                 .threads
                 .iter()
-                .position(|t| t.id == message.id)
+                .position(|t| t.id == id)
                 .expect("Invalid thread id");
             let v_idx = num_messages_per_thread[idx];
             match output_spec[v_idx] {
@@ -81,16 +82,16 @@ impl Jmd {
                 OutputSpec::KineticE
                 | OutputSpec::PotentialE
                 | OutputSpec::Temp
-                | OutputSpec::TotalE => values[v_idx] += message.value,
+                | OutputSpec::TotalE => values[v_idx] += value,
             };
             num_messages_per_thread[idx] += 1;
         };
 
-        handle_output_message(message);
+        handle_output_message(id, value);
         for _i in 1..num_messages_expected {
             let message = self.receive();
             match message {
-                msg::W2M::Output(output) => handle_output_message(output),
+                msg::W2M::Output(id, value) => handle_output_message(id, value),
                 _ => panic!("Invalid communication"),
             };
         }
@@ -116,7 +117,7 @@ impl Jmd {
             }
             msg::W2M::Sender(tx, idx) => self.threads[idx].tx.send(msg::M2W::Sender(tx)).unwrap(),
             msg::W2M::SetupOutput(specs) => *output_spec = specs,
-            msg::W2M::Output(output) => self.output(output, &output_spec),
+            msg::W2M::Output(id, value) => self.output(id, value, &output_spec),
             _ => {}
         };
         Ok(())

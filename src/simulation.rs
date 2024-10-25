@@ -1,13 +1,12 @@
+use std::thread;
+
 use crate::{
     atomic, compute, output,
-    parallel::{
-        comm,
-        message::{self as msg},
-        Domain, Worker,
-    },
+    parallel::{comm, message as msg, Domain, Worker},
+    utils::KeyedVec,
     Atoms, Axis, Container, Error, NeighborList, OutputSpec, BC,
 };
-
+type ComputeVec = KeyedVec<String, Box<dyn compute::Compute>>;
 pub struct Simulation<'a> {
     pub atoms: Atoms,
     container: Container,
@@ -17,7 +16,7 @@ pub struct Simulation<'a> {
     output: output::Output,
     nlocal: usize,
     pos_at_prev_neigh_build: Vec<[f64; 3]>,
-    computes: Vec<Box<dyn compute::Compute>>,
+    computes: ComputeVec,
 }
 impl<'a> Simulation<'a> {
     pub fn new() -> Self {
@@ -32,7 +31,7 @@ impl<'a> Simulation<'a> {
             output: output::Output::new(),
             nlocal: 0,
             pos_at_prev_neigh_build: Vec::new(),
-            computes: Vec::new(),
+            computes: KeyedVec::new(),
         }
     }
 
@@ -57,7 +56,7 @@ impl<'a> Simulation<'a> {
     pub fn nlocal(&self) -> usize {
         self.nlocal
     }
-    pub fn computes(&self) -> &Vec<Box<dyn compute::Compute>> {
+    pub fn computes(&self) -> &ComputeVec {
         &self.computes
     }
 
@@ -91,10 +90,10 @@ impl<'a> Simulation<'a> {
         for o in &output.values {
             match o {
                 OutputSpec::Step => {}
-                OutputSpec::KineticE => self.add_compute(compute::KineticEnergy {}),
-                OutputSpec::PotentialE => self.add_compute(compute::PotentialEnergy {}),
-                OutputSpec::Temp => self.add_compute(compute::Temperature {}),
-                OutputSpec::TotalE => self.add_compute(compute::TotalEnergy {}),
+                OutputSpec::KineticE => self.add_compute("KE", compute::KineticEnergy {}),
+                OutputSpec::PotentialE => self.add_compute("PE", compute::PotentialEnergy {}),
+                OutputSpec::Temp => self.add_compute("Temp", compute::Temperature {}),
+                OutputSpec::TotalE => self.add_compute("E", compute::TotalEnergy {}),
             }
         }
         self.domain
@@ -103,11 +102,8 @@ impl<'a> Simulation<'a> {
     pub(crate) fn increment_nlocal(&mut self) {
         self.nlocal += 1;
     }
-    pub fn add_compute(&mut self, compute: impl compute::Compute + 'static) {
-        self.computes.push(Box::new(compute));
-    }
-    pub fn add_computes(&mut self, mut computes: Vec<Box<dyn compute::Compute + 'static>>) {
-        self.computes.append(&mut computes);
+    pub fn add_compute(&mut self, id: &str, compute: impl compute::Compute + 'static) {
+        self.computes.add(String::from(id), Box::new(compute));
     }
 
     pub(crate) fn forward_comm(&mut self) {
@@ -149,45 +145,22 @@ impl<'a> Simulation<'a> {
             return;
         }
 
-        let ke = if self.output.values.contains(&output::OutputSpec::KineticE)
-            || self.output.values.contains(&output::OutputSpec::Temp)
-            || self.output.values.contains(&output::OutputSpec::TotalE)
-        {
-            Some(self.compute_local_ke())
-        } else {
-            None
-        };
-
-        let pe = if self.output.values.contains(&output::OutputSpec::PotentialE)
-            || self.output.values.contains(&output::OutputSpec::TotalE)
-        {
-            Some(self.compute_local_pe())
-        } else {
-            None
-        };
-
         for v in &self.output.values {
-            let (value, op) = match v {
-                output::OutputSpec::Step => (output::Value::Usize(*step), output::Operation::First),
-                output::OutputSpec::Temp => (
-                    output::Value::Float(ke.unwrap_or(0.0) * 3.0 / self.atoms.num_atoms() as f64),
-                    output::Operation::Sum,
-                ),
-                output::OutputSpec::KineticE => (
-                    output::Value::Float(ke.unwrap_or(0.0)),
-                    output::Operation::Sum,
-                ),
-                output::OutputSpec::PotentialE => (
-                    output::Value::Float(pe.unwrap_or(0.0)),
-                    output::Operation::Sum,
-                ),
-                output::OutputSpec::TotalE => (
-                    output::Value::Float(ke.unwrap_or(0.0) + pe.unwrap_or(0.0)),
-                    output::Operation::Sum,
-                ),
+            let value = match v {
+                output::OutputSpec::Step => compute::ComputeValue::Usize(*step),
+                output::OutputSpec::Temp => {
+                    self.computes().get(&String::from("Temp")).compute(self)
+                }
+                output::OutputSpec::KineticE => {
+                    self.computes().get(&String::from("KE")).compute(self)
+                }
+                output::OutputSpec::PotentialE => {
+                    self.computes().get(&String::from("PE")).compute(self)
+                }
+                output::OutputSpec::TotalE => self.computes().get(&String::from("E")).compute(self),
             };
             self.domain
-                .send_to_main(msg::W2M::Output(output::OutputMessage::new(value, op)));
+                .send_to_main(msg::W2M::Output(thread::current().id(), value));
         }
     }
 
