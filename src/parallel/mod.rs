@@ -6,4 +6,4 @@ mod worker;
 
 pub(crate) use adjacent_procs::AdjacentProcs;
 pub(crate) use domain::Domain;
-pub(crate) use worker::Worker;
+pub use worker::Worker;

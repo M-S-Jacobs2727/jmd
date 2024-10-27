@@ -48,7 +48,12 @@ pub struct NeighborList {
     pub update_settings: UpdateSettings,
 }
 impl NeighborList {
-    pub fn new(container: &Container, force_distance: f64, skin_distance: f64) -> Self {
+    pub fn new(
+        container: &Container,
+        force_distance: f64,
+        skin_distance: f64,
+        update_settings: UpdateSettings,
+    ) -> Self {
         let neighbors: Vec<Vec<usize>> = Vec::new();
         assert!(
             force_distance > 0.0,
@@ -72,7 +77,7 @@ impl NeighborList {
             stencil,
             neighbors,
             is_built: false,
-            update_settings: UpdateSettings::new(1, 0, true),
+            update_settings,
         }
     }
 

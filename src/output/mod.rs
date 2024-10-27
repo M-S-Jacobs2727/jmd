@@ -3,7 +3,8 @@ use std::{
     ops::{Add, AddAssign},
 };
 
-use crate::compute::{Compute, ComputeTrait};
+use crate::compute::Compute;
+use crate::traits::Named;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum OutputSpec {
@@ -116,4 +117,8 @@ pub enum Operation {
     Max,
     Min,
     Sum,
+}
+
+pub trait Operatable {
+    fn op(&self) -> Operation;
 }

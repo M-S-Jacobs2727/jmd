@@ -1,26 +1,26 @@
 use rand_distr::Distribution;
 
-use crate::{neighbor, region::Region, utils, Error};
+use crate::{atom_type::AtomType, neighbor, region::Region, utils, Error};
 
 /// Atom properties during simulation, not including forces
 #[derive(Debug)]
-pub struct Atoms {
+pub struct Atoms<T: AtomType> {
     pub ids: Vec<usize>,
-    pub types: Vec<u32>,
+    pub types: Vec<usize>,
     pub positions: Vec<[f64; 3]>,
     pub velocities: Vec<[f64; 3]>,
-    pub masses: Vec<f64>,
     pub nlocal: usize,
+    atom_types: Vec<T>,
 }
-impl Atoms {
+impl<T: AtomType> Atoms<T> {
     pub fn new() -> Self {
         Atoms {
             ids: Vec::new(),
             types: Vec::new(),
             positions: Vec::new(),
             velocities: Vec::new(),
-            masses: Vec::new(),
             nlocal: 0,
+            atom_types: Vec::new(),
         }
     }
     pub fn num_atoms(&self) -> usize {
@@ -32,7 +32,7 @@ impl Atoms {
     pub fn id_to_idx(&self, id: usize) -> Option<usize> {
         self.ids.iter().position(|x| *x == id)
     }
-    pub fn types(&self) -> &Vec<u32> {
+    pub fn types(&self) -> &Vec<usize> {
         &self.types
     }
     pub fn positions(&self) -> &Vec<[f64; 3]> {
@@ -41,8 +41,14 @@ impl Atoms {
     pub fn velocities(&self) -> &Vec<[f64; 3]> {
         &self.velocities
     }
-    pub fn masses(&self) -> &Vec<f64> {
-        &self.masses
+    pub fn mass(&self, atom_type: usize) -> f64 {
+        self.atom_types[atom_type].mass()
+    }
+    pub fn atom_types(&self) -> &Vec<T> {
+        &self.atom_types
+    }
+    pub fn num_types(&self) -> usize {
+        self.atom_types.len()
     }
     pub fn increment_position(&mut self, i: usize, increment: [f64; 3]) {
         self.positions[i][0] += increment[0];
@@ -66,10 +72,9 @@ impl Atoms {
         let sort_indices = utils::get_sort_indices(&bin_indices);
 
         utils::sort_atoms(&sort_indices, &mut self.ids, 0usize);
-        utils::sort_atoms(&sort_indices, &mut self.types, 0u32);
+        utils::sort_atoms(&sort_indices, &mut self.types, 0usize);
         utils::sort_atoms(&sort_indices, &mut self.positions, [0.0f64, 0.0, 0.0]);
         utils::sort_atoms(&sort_indices, &mut self.velocities, [0.0f64, 0.0, 0.0]);
-        utils::sort_atoms(&sort_indices, &mut self.masses, 0.0f64);
 
         return self
             .positions
@@ -77,13 +82,7 @@ impl Atoms {
             .map(|coord| bins.coord_to_index(coord).idx())
             .collect();
     }
-    pub fn add_random_atoms(
-        &mut self,
-        region: &impl Region,
-        num_atoms: usize,
-        atom_type: u32,
-        mass: f64,
-    ) {
+    pub fn add_random_atoms(&mut self, region: &impl Region, num_atoms: usize, atom_type: usize) {
         let atom_id = match self.ids().iter().max() {
             Some(j) => j + 1,
             None => 0,
@@ -92,17 +91,15 @@ impl Atoms {
         self.types.reserve(num_atoms);
         self.positions.reserve(num_atoms);
         self.velocities.reserve(num_atoms);
-        self.masses.reserve(num_atoms);
         self.nlocal += num_atoms;
 
         for _i in 0..num_atoms {
             self.types.push(atom_type);
-            self.masses.push(mass);
             self.velocities.push([0.0, 0.0, 0.0]);
             self.positions.push(region.get_random_coord())
         }
     }
-    pub fn add_atoms(&mut self, atom_type: u32, mass: f64, coords: Vec<[f64; 3]>) {
+    pub fn add_atoms(&mut self, atom_type: usize, coords: Vec<[f64; 3]>) {
         let num_atoms = coords.len();
         let atom_id = match self.ids().iter().max() {
             Some(j) => j + 1,
@@ -112,12 +109,10 @@ impl Atoms {
         self.types.reserve(num_atoms);
         self.positions.reserve(num_atoms);
         self.velocities.reserve(num_atoms);
-        self.masses.reserve(num_atoms);
         self.nlocal += num_atoms;
 
         for i in 0..num_atoms {
             self.types.push(atom_type);
-            self.masses.push(mass);
             self.velocities.push([0.0, 0.0, 0.0]);
             self.positions.push(coords[i])
         }
@@ -129,9 +124,9 @@ impl Atoms {
         let sqrt_ke: Vec<f64> = dist.sample_iter(&mut rng).take(self.nlocal * 3).collect();
         for i in 0..self.nlocal {
             self.velocities[i] = [
-                sqrt_ke[3 * i + 0] / self.masses[i].sqrt(),
-                sqrt_ke[3 * i + 1] / self.masses[i].sqrt(),
-                sqrt_ke[3 * i + 2] / self.masses[i].sqrt(),
+                sqrt_ke[3 * i + 0] / self.atom_types[self.types[i]].mass().sqrt(),
+                sqrt_ke[3 * i + 1] / self.atom_types[self.types[i]].mass().sqrt(),
+                sqrt_ke[3 * i + 2] / self.atom_types[self.types[i]].mass().sqrt(),
             ];
         }
         Ok(())
@@ -154,8 +149,11 @@ impl Atoms {
 
         self.ids = filter_by_idx(&atom_idxs, &self.ids);
         self.types = filter_by_idx(&atom_idxs, &self.types);
-        self.masses = filter_by_idx(&atom_idxs, &self.masses);
         self.positions = filter_by_idx(&atom_idxs, &self.positions);
         self.velocities = filter_by_idx(&atom_idxs, &self.velocities);
+    }
+
+    pub(crate) fn set_atom_types(&mut self, atom_types: Vec<T>) {
+        self.atom_types = atom_types
     }
 }

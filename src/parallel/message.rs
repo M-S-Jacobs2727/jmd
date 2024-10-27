@@ -1,25 +1,28 @@
 use std::{sync::mpsc, thread};
 
 use crate::{
+    atom_type::AtomType,
     output::{OutputSpec, Value},
-    Atoms, Container, Error, Simulation,
+    Atoms, Container, Error,
 };
+
+use super::Worker;
 
 /// Message between procs communicating atom info
 pub enum AtomMessage {
     Float3(Vec<[f64; 3]>),
     Float(Vec<f64>),
     Int3(Vec<[i32; 3]>),
-    Types(Vec<u32>),
+    Types(Vec<usize>),
     Idxs(Vec<usize>),
 }
 
 /// Worker-to-Manager messages
-pub enum W2M {
+pub enum W2M<T: AtomType> {
     Error(Error),
     Complete,
     Output(thread::ThreadId, Value),
-    Dump(Atoms, Container),
+    Dump(Atoms<T>, Container),
     Id(thread::ThreadId),
     Sender(Option<mpsc::Sender<AtomMessage>>, usize),
     ProcDims([usize; 3]),
@@ -28,10 +31,10 @@ pub enum W2M {
 }
 
 /// Manager-to-Worker messages
-pub enum M2W {
+pub enum M2W<T: AtomType> {
     Error(Error),
     Setup(Vec<thread::ThreadId>),
-    Run(fn(&mut Simulation) -> Result<(), Error>),
+    Run(fn(&Worker<T>) -> Result<(), Error>),
     Sender(Option<mpsc::Sender<AtomMessage>>),
     ProcDims([usize; 3]),
 }

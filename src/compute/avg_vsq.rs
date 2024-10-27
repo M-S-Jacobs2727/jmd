@@ -1,6 +1,10 @@
-use crate::Simulation;
+use crate::{atom_type::AtomType, AtomicPotentialTrait, Simulation};
 
-pub(super) fn compute(simulation: &Simulation) -> f64 {
+pub(super) fn compute<T, A>(simulation: &Simulation<T, A>) -> f64
+where
+    T: AtomType,
+    A: AtomicPotentialTrait<T>,
+{
     simulation
         .atoms
         .velocities

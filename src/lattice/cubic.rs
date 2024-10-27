@@ -8,23 +8,14 @@ pub struct Cubic {
 }
 impl Cubic {
     pub fn new(a: f64) -> Self {
-        let s = Self { a };
-        s.assert_positive();
-        s
+        assert!(a > 0.0, "Lattice constant should be positive, found {}", a);
+        Self { a }
     }
     pub fn from_density(rho: f64) -> Self {
-        let s = Self {
+        assert!(rho > 0.0, "Density should be positive, found {}", rho);
+        Self {
             a: (1.0 / rho).cbrt(),
-        };
-        s.assert_positive();
-        s
-    }
-    fn assert_positive(&self) {
-        assert!(
-            self.a > 0.0,
-            "Lattice constant should be positive, found {}",
-            self.a
-        );
+        }
     }
 }
 impl Lattice for Cubic {

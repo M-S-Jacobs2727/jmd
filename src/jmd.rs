@@ -1,23 +1,25 @@
 use std::thread;
 use std::{sync::mpsc, time::Duration};
 
-use crate::{
-    compute::ComputeTrait, output::*, parallel::message as msg, parallel::Worker, Error, Simulation,
-};
+use crate::atom_type::AtomType;
+use crate::{output::*, parallel::message as msg, parallel::Worker, Error};
 
-struct ThreadContainer {
+struct ThreadContainer<T: AtomType> {
     pub id: thread::ThreadId,
-    pub tx: mpsc::Sender<msg::M2W>,
+    pub tx: mpsc::Sender<msg::M2W<T>>,
     pub handle: thread::JoinHandle<Result<(), Error>>,
 }
 
 /// Main app, used to run a function through parallel workers
-pub struct Jmd {
-    rx: mpsc::Receiver<msg::W2M>,
-    tx: mpsc::Sender<msg::W2M>,
-    threads: Vec<ThreadContainer>,
+pub struct Jmd<T: AtomType> {
+    rx: mpsc::Receiver<msg::W2M<T>>,
+    tx: mpsc::Sender<msg::W2M<T>>,
+    threads: Vec<ThreadContainer<T>>,
 }
-impl Jmd {
+impl<T> Jmd<T>
+where
+    T: AtomType + Send + 'static,
+{
     pub fn new() -> Self {
         let (tx, rx) = mpsc::channel();
         Self {
@@ -52,7 +54,7 @@ impl Jmd {
                 .expect("Disconnect error");
         }
     }
-    fn receive(&self) -> msg::W2M {
+    fn receive(&self) -> msg::W2M<T> {
         self.rx.recv().expect("All procs diconnected")
     }
     fn output(&self, id: thread::ThreadId, value: Value, output_spec: &Vec<OutputSpec>) {
@@ -108,7 +110,7 @@ impl Jmd {
     }
     fn handle_message(
         &self,
-        message: msg::W2M,
+        message: msg::W2M<T>,
         threads_complete: &mut usize,
         output_spec: &mut Vec<OutputSpec>,
     ) -> Result<(), Error> {
@@ -153,7 +155,7 @@ impl Jmd {
     pub fn run(
         &mut self,
         num_threads: usize,
-        f: fn(&mut Simulation) -> Result<(), Error>,
+        f: fn(&Worker<T>) -> Result<(), Error>,
     ) -> Result<(), Error> {
         self.setup(num_threads);
         for thread in &self.threads {

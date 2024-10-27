@@ -10,12 +10,24 @@ impl Index {
             bounds: [0, 0, 0],
         }
     }
+    pub fn from_1d(idx: usize, bounds: [usize; 3]) -> Self {
+        assert!(
+            idx < bounds[0] * bounds[1] * bounds[2],
+            "Index {} should be smaller than the product of the bounds {:?}",
+            idx,
+            bounds
+        );
+        Self { idx, bounds }
+    }
     pub fn from_3d(indices: &[usize; 3], bounds: &[usize; 3]) -> Self {
         let [x, y, z] = *indices;
         let [nx, ny, nz] = *bounds;
-        if x >= nx || y >= ny || z >= nz {
-            panic!("Out of bounds");
-        }
+        assert!(
+            x < nx && y < ny && z < nz,
+            "Indices {:?} should all be less than the bounds {:?}",
+            indices,
+            bounds
+        );
         let idx = x * bounds[1] * bounds[2] + y * bounds[2] + z;
         Self {
             idx,

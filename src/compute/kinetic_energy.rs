@@ -1,12 +1,16 @@
-use crate::Simulation;
+use crate::{atom_type::AtomType, AtomicPotentialTrait, Simulation};
 
-pub(super) fn compute(sim: &Simulation) -> f64 {
+pub(super) fn compute<T, A>(sim: &Simulation<T, A>) -> f64
+where
+    T: AtomType,
+    A: AtomicPotentialTrait<T>,
+{
     0.5 * sim
         .atoms
         .velocities
         .iter()
-        .zip(sim.atoms.masses.iter())
-        .take(sim.nlocal())
-        .map(|(v, m)| m * (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]))
+        .enumerate()
+        .take(sim.atoms.nlocal)
+        .map(|(i, v)| sim.atoms.mass(i) * (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]))
         .sum::<f64>()
 }

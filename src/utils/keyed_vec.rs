@@ -1,5 +1,8 @@
 use std::iter::Zip;
 
+use crate::Error;
+
+#[derive(Debug)]
 pub struct KeyedVec<K, V>
 where
     K: PartialEq,
@@ -17,23 +20,32 @@ where
             values: Vec::new(),
         }
     }
-    pub fn add(&mut self, key: K, value: V) {
+    pub fn add(&mut self, key: K, value: V) -> Result<(), Error> {
         let idx = self.keys.iter().position(|k| *k == key);
-        match idx {
-            Some(_) => panic!("Key already exists!"),
-            None => {}
-        };
+        if let Some(_) = idx {
+            return Err(Error::OtherError);
+        }
         self.keys.push(key);
         self.values.push(value);
+        Ok(())
     }
 
-    pub(crate) fn get(&self, key: &K) -> &V {
-        let idx = self
-            .keys
-            .iter()
-            .position(|k| *k == *key)
-            .expect("Key not found!");
+    pub(crate) fn get(&self, key: &K) -> Result<&V, Error> {
+        let idx = self.keys.iter().position(|k| *k == *key);
+        match idx {
+            Some(i) => Ok(&self.values[i]),
+            None => Err(Error::OtherError),
+        }
+    }
+    pub(crate) fn index(&self, idx: usize) -> &V {
         &self.values[idx]
+    }
+    pub fn len(&self) -> usize {
+        self.keys.len()
+    }
+
+    pub(crate) fn contains(&self, key: &K) -> bool {
+        self.keys.contains(key)
     }
 }
 

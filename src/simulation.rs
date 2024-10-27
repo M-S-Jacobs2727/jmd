@@ -1,107 +1,133 @@
 use std::thread;
 
 use crate::{
+    atom_type::AtomType,
     atomic,
     compute::{self, ComputeTrait},
     output::{self, Value},
     parallel::{comm, message as msg, Domain, Worker},
     utils::KeyedVec,
-    Atoms, Axis, Container, Error, NeighborList, OutputSpec, BC,
+    Atoms, Axis, Container, Error, NeighborList, Output, OutputSpec, UpdateSettings,
 };
 type ComputeVec = KeyedVec<String, compute::Compute>;
 
-pub struct Simulation<'a> {
-    pub atoms: Atoms,
+pub struct Simulation<'a, T, A>
+where
+    T: AtomType,
+    A: atomic::AtomicPotentialTrait<T>,
+{
+    pub atoms: Atoms<T>,
     container: Container,
-    atomic_potential: Box<dyn atomic::AtomicPotential>,
+    atomic_potential: A,
     neighbor_list: NeighborList,
-    domain: Domain<'a>,
+    domain: Domain<'a, T>,
     output: output::Output,
-    nlocal: usize,
     pos_at_prev_neigh_build: Vec<[f64; 3]>,
     computes: ComputeVec,
 }
-impl<'a> Simulation<'a> {
-    pub fn new() -> Self {
-        let container = Container::new(0., 10., 0.0, 10.0, 0.0, 10.0, BC::PP, BC::PP, BC::PP);
-        let neighbor_list = NeighborList::new(&container, 1.0, 1.0);
+impl<'a, T, A> Simulation<'a, T, A>
+where
+    T: AtomType,
+    A: atomic::AtomicPotentialTrait<T>,
+{
+    pub fn new(atoms: Atoms<T>, atomic_potential: A, container: Container) -> Self {
+        let neighbor_list = NeighborList::new(
+            &container,
+            atomic_potential.cutoff_distance(),
+            1.0,
+            UpdateSettings::new(1, 0, true),
+        );
         Self {
-            atoms: Atoms::new(),
+            atoms,
             container,
-            atomic_potential: Box::new(atomic::None_::new()),
+            atomic_potential,
             neighbor_list,
             domain: Domain::new(),
             output: output::Output::new(),
-            nlocal: 0,
             pos_at_prev_neigh_build: Vec::new(),
             computes: KeyedVec::new(),
         }
     }
 
     /// Initializes the simulation from a worker thread
-    pub(crate) fn init(&mut self, worker: Box<&'a Worker>) {
-        self.domain.init(&self.container, worker);
+    pub fn connect(&mut self, worker: Box<&'a Worker<T>>) -> Result<(), crate::Error> {
+        self.domain.init(&self.container, worker)
     }
 
     // Getters
     pub fn container(&self) -> &Container {
         &self.container
     }
-    pub fn atomic_potential(&self) -> &Box<dyn atomic::AtomicPotential> {
+    pub fn atomic_potential(&self) -> &A {
         &self.atomic_potential
+    }
+    pub fn mut_atomic_potential(&mut self) -> &mut A {
+        &mut self.atomic_potential
     }
     pub fn neighbor_list(&self) -> &NeighborList {
         &self.neighbor_list
     }
-    pub fn domain(&self) -> &Domain {
+    pub(crate) fn domain(&self) -> &Domain<T> {
         &self.domain
     }
-    pub fn nlocal(&self) -> usize {
-        self.nlocal
+    pub(crate) fn nlocal(&self) -> usize {
+        self.atoms.nlocal
     }
     pub fn computes(&self) -> &ComputeVec {
         &self.computes
     }
+    pub fn get_compute(&self, id: &str) -> Result<&compute::Compute, Error> {
+        self.computes.get(&String::from(id))
+    }
 
     // Setters
-    pub fn set_atom_types(&mut self, atom_types: usize) -> Result<(), Error> {
-        self.atomic_potential.set_num_types(atom_types)
-    }
     pub fn set_container(&mut self, container: Container) {
         self.container = container;
         self.domain.reset_subdomain(&self.container);
     }
-    pub fn set_atomic_potential(
-        &mut self,
-        atomic_potential: impl atomic::AtomicPotential + 'static,
-    ) {
-        self.atomic_potential = Box::new(atomic_potential);
-        let force_distance = self.atomic_potential.cutoff_distance();
-        let skin_distance = 1.0;
-        self.neighbor_list = NeighborList::new(self.container(), force_distance, skin_distance);
+    pub fn set_neighbor_list(&mut self, skin_distance: f64, update_settings: UpdateSettings) {
+        self.neighbor_list = NeighborList::new(
+            &self.container,
+            self.atomic_potential.cutoff_distance(),
+            skin_distance,
+            update_settings,
+        );
     }
-    pub fn set_neighbor_list(&mut self, neighbor_list: NeighborList) {
-        self.neighbor_list = neighbor_list;
-    }
-    pub fn set_domain(&mut self, domain: Domain<'a>) {
+    pub fn set_domain(&mut self, domain: Domain<'a, T>) {
         self.domain = domain;
     }
-    pub fn set_output(&mut self, output: output::Output) {
-        self.output = output.clone();
-        for o in &output.values {
-            match o {
-                OutputSpec::Step => {}
-                OutputSpec::Compute(c) => {}
+    pub fn set_output(&mut self, every: usize, output_keys: Vec<&str>) -> Result<(), Error> {
+        let mut output_specs: Vec<OutputSpec> = Vec::new();
+        output_specs.reserve(output_keys.len());
+        for key in output_keys {
+            if key == "step" {
+                output_specs.push(OutputSpec::Step);
+            } else if self.computes.contains(&String::from(key)) {
+                let result = self.get_compute(key);
+                match result {
+                    Ok(c) => output_specs.push(OutputSpec::Compute(c.clone())),
+                    Err(e) => return Err(e),
+                }
+            } else {
+                return Err(Error::OtherError);
             }
         }
         self.domain
-            .send_to_main(msg::W2M::SetupOutput(output.values));
+            .send_to_main(msg::W2M::SetupOutput(self.output.values.clone()));
+        self.output = Output {
+            every,
+            values: output_specs,
+        };
+        Ok(())
     }
     pub(crate) fn increment_nlocal(&mut self) {
-        self.nlocal += 1;
+        self.atoms.nlocal += 1;
     }
-    pub fn add_compute(&mut self, id: &str, compute: compute::Compute) {
-        self.computes.add(String::from(id), compute);
+    pub fn add_compute(&mut self, id: &str, compute: compute::Compute) -> Result<(), Error> {
+        self.computes.add(String::from(id), compute)
+    }
+    pub fn set_atom_types(&mut self, atom_types: Vec<T>) {
+        self.atoms.set_atom_types(atom_types)
     }
 
     pub(crate) fn forward_comm(&mut self) {
@@ -112,7 +138,8 @@ impl<'a> Simulation<'a> {
     }
 
     pub(crate) fn compute_forces(&self) -> Vec<[f64; 3]> {
-        self.atomic_potential.compute_forces(self)
+        self.atomic_potential
+            .compute_forces(&self.atoms, &self.neighbor_list)
     }
 
     pub(crate) fn check_build_neighbor_list(&mut self, step: &usize) {

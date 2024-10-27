@@ -4,23 +4,23 @@ mod none;
 pub use ljcut::LJCut;
 pub use none::None_;
 
-use crate::{Error, Simulation};
+use crate::{atom_type::AtomType, Atoms, NeighborList};
 
 /// Trait for pairwise atomic potentials
-pub trait AtomicPotential {
+pub trait AtomicPotentialTrait<T: AtomType> {
     /// Get the maximum distance for effective interaction
     fn cutoff_distance(&self) -> f64;
 
     /// Compute the pairwise force given a configuration of atoms
-    fn compute_forces(&self, sim: &Simulation) -> Vec<[f64; 3]>;
+    fn compute_forces(&self, atoms: &Atoms<T>, neighbor_list: &NeighborList) -> Vec<[f64; 3]>;
 
     /// Increase or decrease the number of atom types
-    fn set_num_types(&mut self, num_types: usize) -> Result<(), Error>;
+    fn set_num_types(&mut self, num_types: usize);
 
     fn num_types(&self) -> usize;
-    fn compute_potential_energy(&self, sim: &Simulation) -> f64;
+    fn compute_potential_energy(&self, atoms: &Atoms<T>, neighbor_list: &NeighborList) -> f64;
 
-    fn type_idx(&self, typei: u32, typej: u32) -> usize {
-        self.num_types() * typei as usize + typej as usize
+    fn type_idx(&self, typei: usize, typej: usize) -> usize {
+        self.num_types() * typei + typej
     }
 }

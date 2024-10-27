@@ -1,9 +1,13 @@
 mod verlet;
 pub use verlet::Verlet;
 
-use crate::Simulation;
+use crate::{atom_type::AtomType, AtomicPotentialTrait, Simulation};
 
 /// Simulation integrator
-pub trait Integrator {
-    fn run(&self, simulation: &mut Simulation, num_steps: usize);
+pub trait Integrator<T, A>
+where
+    T: AtomType,
+    A: AtomicPotentialTrait<T>,
+{
+    fn run(&self, simulation: &mut Simulation<T, A>, num_steps: usize);
 }

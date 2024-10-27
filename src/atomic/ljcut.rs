@@ -1,5 +1,5 @@
-use super::AtomicPotential;
-use crate::{utils::Types, Error, Simulation};
+use super::AtomicPotentialTrait;
+use crate::{atom_type::AtomType, Error};
 
 #[derive(Clone, Copy, Debug)]
 struct LJCutCoeff {
@@ -46,42 +46,34 @@ pub struct LJCut {
     coeff_set: Vec<bool>,
 }
 impl LJCut {
-    pub fn new(num_types: usize, force_cutoff: f64) -> Self {
-        let new_len = num_types * num_types;
-        let mut coeffs: Vec<LJCutCoeff> = Vec::new();
-        let mut coeff_set: Vec<bool> = Vec::new();
-        coeffs.resize(new_len, LJCut::default_coeff());
-        coeff_set.resize(new_len, false);
+    pub fn new(force_cutoff: f64) -> Self {
+        assert!(
+            force_cutoff > 0.0,
+            "Force cutoff should be positive, found {}",
+            force_cutoff
+        );
         Self {
-            num_types,
+            num_types: 0,
             force_cutoff,
-            coeffs,
-            coeff_set,
+            coeffs: Vec::new(),
+            coeff_set: Vec::new(),
         }
     }
-    pub fn set_coeff(
+    pub fn set_coeff<T: AtomType>(
         &mut self,
-        type_i: Types,
-        type_j: Types,
+        typei: usize,
+        typej: usize,
         sigma: f64,
         epsilon: f64,
         rcut: f64,
     ) -> Result<(), Error> {
-        let itypes = type_i.to_vec();
-        let jtypes = type_j.to_vec();
-        if itypes.iter().any(|&t| t as usize >= self.num_types)
-            || jtypes.iter().any(|&t| t as usize >= self.num_types)
-        {
+        if typei >= self.num_types || typej >= self.num_types {
             return Err(Error::AtomicPotentialError);
         }
 
-        for i in &itypes {
-            for j in &jtypes {
-                let index = self.type_idx(*i, *j);
-                self.coeff_set[index] = true;
-                self.coeffs[index] = LJCutCoeff::new(sigma, epsilon, rcut);
-            }
-        }
+        let index = <Self as AtomicPotentialTrait<T>>::type_idx(self, typei, typej);
+        self.coeff_set[index] = true;
+        self.coeffs[index] = LJCutCoeff::new(sigma, epsilon, rcut);
 
         Ok(())
     }
@@ -93,20 +85,24 @@ impl LJCut {
     }
 }
 
-impl AtomicPotential for LJCut {
+impl<T: AtomType> AtomicPotentialTrait<T> for LJCut {
     fn cutoff_distance(&self) -> f64 {
         self.force_cutoff
     }
     // TODO: check that forces are not double counted
     // should be newton-pair full, not half, because half neighbor list
-    fn compute_forces(&self, sim: &Simulation) -> Vec<[f64; 3]> {
+    fn compute_forces(
+        &self,
+        atoms: &crate::Atoms<T>,
+        neighbor_list: &crate::NeighborList,
+    ) -> Vec<[f64; 3]> {
         let mut forces: Vec<[f64; 3]> = Vec::new();
-        forces.resize(sim.atoms.num_atoms(), [0.0, 0.0, 0.0]);
-        for i in 0..sim.atoms.nlocal {
-            let typei = &sim.atoms.types[i];
-            let posi = &sim.atoms.positions[i];
+        forces.resize(atoms.num_atoms(), [0.0, 0.0, 0.0]);
+        for i in 0..atoms.nlocal {
+            let typei = &atoms.types[i];
+            let posi = &atoms.positions[i];
 
-            for j in &sim.neighbor_list().neighbors()[i] {
+            for j in &neighbor_list.neighbors()[i] {
                 if i == *j {
                     continue;
                 }
@@ -119,10 +115,11 @@ impl AtomicPotential for LJCut {
                 // f(r_ij) = r_ij * -24 eps / sig^2, so if r_ij = r_j - r_i = (sig, 0),
                 // then f_i = f(r_ij) and f_j = -f(r_ij)
 
-                let typej = &sim.atoms.types[*j];
-                let posj = &sim.atoms.positions[*j];
+                let typej = &atoms.types[*j];
+                let posj = &atoms.positions[*j];
 
-                let coeff = self.coeffs[self.type_idx(*typei, *typej)];
+                let idx = <Self as AtomicPotentialTrait<T>>::type_idx(&self, *typei, *typej);
+                let coeff = self.coeffs[idx];
                 let r = [posi[0] - posj[0], posi[1] - posj[1], posi[2] - posj[2]];
                 let r2 = r[0] * r[0] + r[1] * r[1] + r[2] * r[2];
 
@@ -140,14 +137,18 @@ impl AtomicPotential for LJCut {
 
         forces
     }
-    fn compute_potential_energy(&self, sim: &Simulation) -> f64 {
+    fn compute_potential_energy(
+        &self,
+        atoms: &crate::Atoms<T>,
+        neighbor_list: &crate::NeighborList,
+    ) -> f64 {
         let mut energy = 0.0;
 
-        for i in 0..sim.atoms.nlocal {
-            let typei = &sim.atoms.types[i];
-            let posi = &sim.atoms.positions[i];
+        for i in 0..atoms.nlocal {
+            let typei = &atoms.types[i];
+            let posi = &atoms.positions[i];
 
-            for j in &sim.neighbor_list().neighbors()[i] {
+            for j in &neighbor_list.neighbors()[i] {
                 if i == *j {
                     continue;
                 }
@@ -160,10 +161,11 @@ impl AtomicPotential for LJCut {
                 // f(r_ij) = r_ij * -24 eps / sig^2, so if r_ij = r_j - r_i = (sig, 0),
                 // then f_i = f(r_ij) and f_j = -f(r_ij)
 
-                let typej = &sim.atoms.types[*j];
-                let posj = &sim.atoms.positions[*j];
+                let typej = &atoms.types[*j];
+                let posj = &atoms.positions[*j];
 
-                let coeff = self.coeffs[self.type_idx(*typei, *typej)];
+                let idx = <Self as AtomicPotentialTrait<T>>::type_idx(&self, *typei, *typej);
+                let coeff = self.coeffs[idx];
                 let r = [posi[0] - posj[0], posi[1] - posj[1], posi[2] - posj[2]];
                 let r2 = r[0] * r[0] + r[1] * r[1] + r[2] * r[2];
 
@@ -182,16 +184,16 @@ impl AtomicPotential for LJCut {
     fn num_types(&self) -> usize {
         self.num_types
     }
-    fn set_num_types(&mut self, num_types: usize) -> Result<(), Error> {
+    fn set_num_types(&mut self, num_types: usize) {
         if self.num_types == num_types {
-            return Ok(());
+            return;
         }
         let new_len = num_types * num_types;
         if self.num_types == 0 {
             self.num_types = num_types;
             self.coeff_set.resize(new_len, false);
             self.coeffs.resize(new_len, LJCut::default_coeff());
-            return Ok(());
+            return;
         }
 
         // Get currently set indices
@@ -240,7 +242,5 @@ impl AtomicPotential for LJCut {
             self.coeffs.resize(new_len, LJCut::default_coeff());
             self.coeff_set.resize(new_len, false);
         }
-
-        Ok(())
     }
 }

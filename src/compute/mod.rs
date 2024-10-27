@@ -1,6 +1,8 @@
 use crate::{
-    output::{Operation, Value},
-    Simulation,
+    atom_type::AtomType,
+    output::{Operatable, Operation, Value},
+    traits::Named,
+    AtomicPotentialTrait, Simulation,
 };
 
 mod avg_vsq;
@@ -17,8 +19,12 @@ pub enum Compute {
     Temperature,
     TotalE,
 }
-impl ComputeTrait for Compute {
-    fn compute(&self, sim: &Simulation) -> Value {
+impl<T, A> ComputeTrait<T, A> for Compute
+where
+    T: AtomType,
+    A: AtomicPotentialTrait<T>,
+{
+    fn compute(&self, sim: &Simulation<T, A>) -> Value {
         match self {
             Compute::AvgVsq => Value::Float(avg_vsq::compute(sim)),
             Compute::KineticE => Value::Float(kinetic_energy::compute(sim)),
@@ -27,6 +33,8 @@ impl ComputeTrait for Compute {
             Compute::TotalE => Value::Float(total_energy::compute(sim)),
         }
     }
+}
+impl Named for Compute {
     fn name(&self) -> &str {
         match self {
             Compute::AvgVsq => "AvgVsq",
@@ -36,6 +44,8 @@ impl ComputeTrait for Compute {
             Compute::TotalE => "TotalE",
         }
     }
+}
+impl Operatable for Compute {
     fn op(&self) -> Operation {
         match self {
             Compute::AvgVsq
@@ -47,8 +57,10 @@ impl ComputeTrait for Compute {
     }
 }
 
-pub trait ComputeTrait {
-    fn compute(&self, sim: &Simulation) -> Value;
-    fn name(&self) -> &str;
-    fn op(&self) -> Operation;
+pub trait ComputeTrait<T, A>
+where
+    T: AtomType,
+    A: AtomicPotentialTrait<T>,
+{
+    fn compute(&self, sim: &Simulation<T, A>) -> Value;
 }
