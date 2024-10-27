@@ -1,8 +1,9 @@
 use std::thread;
 use std::{sync::mpsc, time::Duration};
 
-use crate::compute::ComputeValue;
-use crate::{output::*, parallel::message as msg, parallel::Worker, Error, Simulation};
+use crate::{
+    compute::ComputeTrait, output::*, parallel::message as msg, parallel::Worker, Error, Simulation,
+};
 
 struct ThreadContainer {
     pub id: thread::ThreadId,
@@ -54,47 +55,51 @@ impl Jmd {
     fn receive(&self) -> msg::W2M {
         self.rx.recv().expect("All procs diconnected")
     }
-    fn output(&self, id: thread::ThreadId, value: ComputeValue, output_spec: &Vec<OutputSpec>) {
+    fn output(&self, id: thread::ThreadId, value: Value, output_spec: &Vec<OutputSpec>) {
         let num_messages_expected = self.threads.len() * output_spec.len();
-        let mut values: Vec<ComputeValue> = output_spec
-            .iter()
-            .map(|s| match s {
-                OutputSpec::Step => ComputeValue::Usize(0),
-                OutputSpec::KineticE
-                | OutputSpec::PotentialE
-                | OutputSpec::Temp
-                | OutputSpec::TotalE => ComputeValue::Float(0.0),
-            })
-            .collect();
-
         let mut num_messages_per_thread: Vec<usize> = Vec::new();
         num_messages_per_thread.resize(self.threads.len(), 0);
 
-        let mut handle_output_message = |id: thread::ThreadId, value: ComputeValue| {
-            let idx = self
-                .threads
-                .iter()
-                .position(|t| t.id == id)
-                .expect("Invalid thread id");
-            let v_idx = num_messages_per_thread[idx];
-            match output_spec[v_idx] {
-                OutputSpec::Step => {}
-                OutputSpec::KineticE
-                | OutputSpec::PotentialE
-                | OutputSpec::Temp
-                | OutputSpec::TotalE => values[v_idx] += value,
-            };
-            num_messages_per_thread[idx] += 1;
-        };
-
-        handle_output_message(id, value);
+        let mut values_per_thread: Vec<Vec<Value>> = Vec::new();
+        values_per_thread.resize_with(self.threads.len(), || Vec::new());
+        let idx = self
+            .threads
+            .iter()
+            .position(|t| t.id == id)
+            .expect("Invalid thread id");
+        values_per_thread[idx].push(value);
         for _i in 1..num_messages_expected {
             let message = self.receive();
             match message {
-                msg::W2M::Output(id, value) => handle_output_message(id, value),
-                _ => panic!("Invalid communication"),
+                msg::W2M::Output(id, value) => {
+                    let idx = self
+                        .threads
+                        .iter()
+                        .position(|t| t.id == id)
+                        .expect("Invalid thread id");
+                    values_per_thread[idx].push(value);
+                }
+                _ => {}
             };
         }
+
+        let values: Vec<Value> = output_spec
+            .iter()
+            .enumerate()
+            .map(|(i, spec)| match spec {
+                OutputSpec::Step => values_per_thread[0][i].clone(),
+                OutputSpec::Compute(c) => values_per_thread
+                    .iter()
+                    .map(|vec| vec[i].clone())
+                    .reduce(|acc, v| match c.op() {
+                        Operation::Sum => acc + v,
+                        Operation::First => acc,
+                        Operation::Max => acc.max(v),
+                        Operation::Min => acc.min(v),
+                    })
+                    .expect("No threads"),
+            })
+            .collect();
 
         for v in values {
             print!("{}\t", v);

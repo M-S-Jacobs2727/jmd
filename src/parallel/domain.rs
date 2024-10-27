@@ -44,8 +44,8 @@ fn procs_in_box(nprocs: usize, lx: f64, ly: f64, lz: f64) -> [usize; 3] {
 
 /// Represents a process in relation to the other neighboring processes
 pub struct Domain<'a> {
-    receiver: mpsc::Receiver<msg::Message>,
-    my_sender: mpsc::Sender<msg::Message>,
+    receiver: mpsc::Receiver<msg::AtomMessage>,
+    my_sender: mpsc::Sender<msg::AtomMessage>,
     worker: Option<Box<&'a Worker>>,
     procs: AdjacentProcs,
     subdomain: Rect,
@@ -251,16 +251,16 @@ impl<'a> Domain<'a> {
         }
     }
 
-    pub fn clone_sender(&self) -> mpsc::Sender<msg::Message> {
+    pub fn clone_sender(&self) -> mpsc::Sender<msg::AtomMessage> {
         self.my_sender.clone()
     }
-    pub fn receiver(&self) -> &mpsc::Receiver<msg::Message> {
+    pub fn receiver(&self) -> &mpsc::Receiver<msg::AtomMessage> {
         &self.receiver
     }
     pub fn neighbor_procs(&self) -> &AdjacentProcs {
         &self.procs
     }
-    pub fn set_neighbor_proc(&mut self, direction: Direction, sender: mpsc::Sender<msg::Message>) {
+    pub fn set_neighbor_proc(&mut self, direction: Direction, sender: mpsc::Sender<msg::AtomMessage>) {
         self.procs.set(direction, sender);
     }
     pub fn thread_ids(&self) -> &Vec<ThreadId> {
@@ -273,14 +273,14 @@ impl<'a> Domain<'a> {
             .filter(|&&p| (*p).is_some())
             .count()
     }
-    pub fn receive(&self) -> msg::Message {
+    pub fn receive(&self) -> msg::AtomMessage {
         self.receiver.recv().expect("Disconnect error")
     }
     pub fn send(
         &self,
-        value: msg::Message,
+        value: msg::AtomMessage,
         neighbor: Direction,
-    ) -> Result<(), mpsc::SendError<msg::Message>> {
+    ) -> Result<(), mpsc::SendError<msg::AtomMessage>> {
         let n = match neighbor {
             Direction::Xlo => self.procs.xlo(),
             Direction::Xhi => self.procs.xhi(),

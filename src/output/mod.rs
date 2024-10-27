@@ -1,39 +1,20 @@
-use std::{fmt::Display, ops::AddAssign, thread};
+use std::{
+    fmt::Display,
+    ops::{Add, AddAssign},
+};
 
-pub enum Cumulation {
-    Match,
-    Sum,
-    Max,
-    Min,
-}
-pub struct OutputFormat {
-    name: String,
-    cumulation: Cumulation,
-}
-impl OutputFormat {
-    pub fn new(name: &str, cumulation: Cumulation) -> Self {
-        Self {
-            name: String::from(name),
-            cumulation,
-        }
-    }
-}
-#[derive(Clone, Copy, Debug, PartialEq)]
+use crate::compute::{Compute, ComputeTrait};
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum OutputSpec {
     Step,
-    Temp,
-    KineticE,
-    PotentialE,
-    TotalE,
+    Compute(Compute),
 }
 impl Display for OutputSpec {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
             OutputSpec::Step => "Step",
-            OutputSpec::Temp => "Temp",
-            OutputSpec::KineticE => "KineticE",
-            OutputSpec::PotentialE => "PotentialE",
-            OutputSpec::TotalE => "TotalE",
+            OutputSpec::Compute(c) => c.name(),
         };
         String::from(s).fmt(f)
     }
@@ -56,6 +37,7 @@ impl Output {
 // After init run, set_output should send one message to manager
 // On output, send thread_id w/ nlocal, then thread_id with each value
 
+#[derive(Clone, Debug)]
 pub enum Value {
     Int(i32),
     Usize(usize),
@@ -81,6 +63,33 @@ impl Value {
             },
         }
     }
+    pub fn max(self, other: Self) -> Self {
+        match (self, other) {
+            (Value::Float(f1), Value::Float(f2)) => Value::Float(f64::max(f1, f2)),
+            (Value::Int(i1), Value::Int(i2)) => Value::Int(i1.max(i2)),
+            (Value::Usize(u1), Value::Usize(u2)) => Value::Usize(u1.max(u2)),
+            _ => panic!("Mismatched types"),
+        }
+    }
+    pub fn min(self, other: Self) -> Self {
+        match (self, other) {
+            (Value::Float(f1), Value::Float(f2)) => Value::Float(f64::min(f1, f2)),
+            (Value::Int(i1), Value::Int(i2)) => Value::Int(i1.min(i2)),
+            (Value::Usize(u1), Value::Usize(u2)) => Value::Usize(u1.min(u2)),
+            _ => panic!("Mismatched types"),
+        }
+    }
+}
+impl Add for Value {
+    type Output = Value;
+    fn add(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (Value::Float(i), Value::Float(j)) => Value::Float(i + j),
+            (Value::Int(i), Value::Int(j)) => Value::Int(i + j),
+            (Value::Usize(i), Value::Usize(j)) => Value::Usize(i + j),
+            _ => panic!("Mismatched types"),
+        }
+    }
 }
 impl AddAssign for Value {
     fn add_assign(&mut self, rhs: Self) {
@@ -101,23 +110,10 @@ impl Display for Value {
         }
     }
 }
+#[derive(Clone, Debug, PartialEq)]
 pub enum Operation {
     First,
     Max,
     Min,
     Sum,
-}
-pub struct OutputMessage {
-    pub id: thread::ThreadId,
-    pub value: Value,
-    pub op: Operation,
-}
-impl OutputMessage {
-    pub fn new(value: Value, op: Operation) -> Self {
-        Self {
-            id: thread::current().id(),
-            value,
-            op,
-        }
-    }
 }

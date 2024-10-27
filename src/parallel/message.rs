@@ -1,9 +1,12 @@
 use std::{sync::mpsc, thread};
 
-use crate::{compute::ComputeValue, output::OutputSpec, Atoms, Container, Error, Simulation};
+use crate::{
+    output::{OutputSpec, Value},
+    Atoms, Container, Error, Simulation,
+};
 
 /// Message between procs communicating atom info
-pub enum Message {
+pub enum AtomMessage {
     Float3(Vec<[f64; 3]>),
     Float(Vec<f64>),
     Int3(Vec<[i32; 3]>),
@@ -15,10 +18,10 @@ pub enum Message {
 pub enum W2M {
     Error(Error),
     Complete,
-    Output(thread::ThreadId, ComputeValue),
+    Output(thread::ThreadId, Value),
     Dump(Atoms, Container),
     Id(thread::ThreadId),
-    Sender(Option<mpsc::Sender<Message>>, usize),
+    Sender(Option<mpsc::Sender<AtomMessage>>, usize),
     ProcDims([usize; 3]),
     SetupOutput(Vec<OutputSpec>),
     InitialOutput,
@@ -29,6 +32,6 @@ pub enum M2W {
     Error(Error),
     Setup(Vec<thread::ThreadId>),
     Run(fn(&mut Simulation) -> Result<(), Error>),
-    Sender(Option<mpsc::Sender<Message>>),
+    Sender(Option<mpsc::Sender<AtomMessage>>),
     ProcDims([usize; 3]),
 }

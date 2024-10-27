@@ -49,9 +49,9 @@ impl Integrator for Verlet {
         simulation.build_neighbor_list();
         let mut forces = simulation.compute_forces();
         simulation.reverse_comm(&mut forces);
+        simulation.check_do_output(&0);
 
-        for step in 0..num_steps {
-            dbg!("=====================================");
+        for step in 1..=num_steps {
             self.increment_velocity_halfstep(simulation, &forces);
             self.increment_positions(simulation);
             simulation.forward_comm();

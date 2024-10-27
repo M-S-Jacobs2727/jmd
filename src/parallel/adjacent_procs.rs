@@ -1,16 +1,16 @@
 use std::sync::mpsc;
 
-use super::message::Message;
+use super::message::AtomMessage;
 use crate::Direction;
 
 /// Message transmitters to the six neighboring processes
 pub struct AdjacentProcs {
-    xlo: Option<mpsc::Sender<Message>>,
-    xhi: Option<mpsc::Sender<Message>>,
-    ylo: Option<mpsc::Sender<Message>>,
-    yhi: Option<mpsc::Sender<Message>>,
-    zlo: Option<mpsc::Sender<Message>>,
-    zhi: Option<mpsc::Sender<Message>>,
+    xlo: Option<mpsc::Sender<AtomMessage>>,
+    xhi: Option<mpsc::Sender<AtomMessage>>,
+    ylo: Option<mpsc::Sender<AtomMessage>>,
+    yhi: Option<mpsc::Sender<AtomMessage>>,
+    zlo: Option<mpsc::Sender<AtomMessage>>,
+    zhi: Option<mpsc::Sender<AtomMessage>>,
 }
 impl AdjacentProcs {
     pub fn new() -> Self {
@@ -23,12 +23,12 @@ impl AdjacentProcs {
             zhi: None,
         }
     }
-    pub fn as_vec(&self) -> Vec<&Option<mpsc::Sender<Message>>> {
+    pub fn as_vec(&self) -> Vec<&Option<mpsc::Sender<AtomMessage>>> {
         vec![
             &self.xlo, &self.xhi, &self.ylo, &self.yhi, &self.zlo, &self.zhi,
         ]
     }
-    pub fn set(&mut self, direction: Direction, sender: mpsc::Sender<Message>) {
+    pub fn set(&mut self, direction: Direction, sender: mpsc::Sender<AtomMessage>) {
         match direction {
             Direction::Xlo => self.xlo = Some(sender),
             Direction::Xhi => self.xhi = Some(sender),
@@ -38,22 +38,22 @@ impl AdjacentProcs {
             Direction::Zhi => self.zhi = Some(sender),
         };
     }
-    pub fn xlo(&self) -> &Option<mpsc::Sender<Message>> {
+    pub fn xlo(&self) -> &Option<mpsc::Sender<AtomMessage>> {
         &self.xlo
     }
-    pub fn xhi(&self) -> &Option<mpsc::Sender<Message>> {
+    pub fn xhi(&self) -> &Option<mpsc::Sender<AtomMessage>> {
         &self.xhi
     }
-    pub fn ylo(&self) -> &Option<mpsc::Sender<Message>> {
+    pub fn ylo(&self) -> &Option<mpsc::Sender<AtomMessage>> {
         &self.ylo
     }
-    pub fn yhi(&self) -> &Option<mpsc::Sender<Message>> {
+    pub fn yhi(&self) -> &Option<mpsc::Sender<AtomMessage>> {
         &self.yhi
     }
-    pub fn zlo(&self) -> &Option<mpsc::Sender<Message>> {
+    pub fn zlo(&self) -> &Option<mpsc::Sender<AtomMessage>> {
         &self.zlo
     }
-    pub fn zhi(&self) -> &Option<mpsc::Sender<Message>> {
+    pub fn zhi(&self) -> &Option<mpsc::Sender<AtomMessage>> {
         &self.zhi
     }
 }

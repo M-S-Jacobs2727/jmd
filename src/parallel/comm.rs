@@ -1,4 +1,4 @@
-use crate::{parallel::message::Message, Direction, Rect, Region, Simulation};
+use crate::{parallel::message::AtomMessage, Direction, Rect, Region, Simulation};
 
 pub(crate) fn reverse_comm(sim: &Simulation, forces: &mut Vec<[f64; 3]>) {
     let mut sent_ids: Vec<usize> = Vec::new();
@@ -72,7 +72,9 @@ fn collect_comm_atoms(sim: &Simulation, direction: &Direction) -> Vec<usize> {
 fn send_atoms(sim: &mut Simulation, direction: Direction) {
     let atom_idxs = collect_comm_atoms(sim, &direction);
     let ids: Vec<usize> = atom_idxs.iter().map(|i| sim.atoms.ids[*i]).collect();
-    sim.domain().send(Message::Idxs(ids), direction).unwrap();
+    sim.domain()
+        .send(AtomMessage::Idxs(ids), direction)
+        .unwrap();
 
     sim.atoms.remove_idxs(atom_idxs);
 }
@@ -80,15 +82,12 @@ fn send_atoms(sim: &mut Simulation, direction: Direction) {
 fn recv_atoms(sim: &mut Simulation) {
     let msg = sim.domain().receive();
     match msg {
-        Message::Idxs(new_ids) => {
-            let idx = sim
-                .atoms
-                .ids
-                .iter()
-                .position(|id| new_ids.contains(id))
-                .expect("Missing atom");
-            if sim.container().rect().contains(&sim.atoms.positions[idx]) {
-                sim.increment_nlocal();
+        AtomMessage::Idxs(new_ids) => {
+            let opt = sim.atoms.ids.iter().position(|id| new_ids.contains(id));
+            if let Some(idx) = opt {
+                if sim.container().rect().contains(&sim.atoms.positions[idx]) {
+                    sim.increment_nlocal();
+                }
             }
         }
         _ => panic!("Invalid message"),
@@ -121,10 +120,10 @@ fn recv_reverse_comm(sim: &Simulation, forces: &mut Vec<[f64; 3]>) {
     let id_msg = sim.domain().receive();
     let force_msg = sim.domain().receive();
     match (id_msg, force_msg) {
-        (Message::Idxs(ids), Message::Float3(new_forces)) => {
+        (AtomMessage::Idxs(ids), AtomMessage::Float3(new_forces)) => {
             accumulate_forces(sim, &ids, &new_forces, forces)
         }
-        (Message::Float3(new_forces), Message::Idxs(ids)) => {
+        (AtomMessage::Float3(new_forces), AtomMessage::Idxs(ids)) => {
             accumulate_forces(sim, &ids, &new_forces, forces)
         }
         _ => panic!("Invalid communication"),
@@ -139,11 +138,11 @@ fn recv_forward_comm(sim: &mut Simulation) {
     let vel_msg = sim.domain().receive();
     match (id_msg, type_msg, mass_msg, pos_msg, vel_msg) {
         (
-            Message::Idxs(ids),
-            Message::Types(types),
-            Message::Float(masses),
-            Message::Float3(positions),
-            Message::Float3(velocities),
+            AtomMessage::Idxs(ids),
+            AtomMessage::Types(types),
+            AtomMessage::Float(masses),
+            AtomMessage::Float3(positions),
+            AtomMessage::Float3(velocities),
         ) => {
             update_ghost_atoms(sim, ids, types, masses, positions, velocities);
         }
@@ -209,10 +208,10 @@ fn send_reverse_comm(sim: &Simulation, forces: &Vec<[f64; 3]>, direction: Direct
     }
 
     sim.domain()
-        .send(Message::Idxs(ids.clone()), direction)
+        .send(AtomMessage::Idxs(ids.clone()), direction)
         .expect("Disconnect error");
     sim.domain()
-        .send(Message::Float3(send_forces), direction)
+        .send(AtomMessage::Float3(send_forces), direction)
         .expect("Disconnect error");
     ids
 }
@@ -232,11 +231,11 @@ fn send_forward_comm(sim: &Simulation, direction: Direction) {
     let positions: Vec<[f64; 3]> = gather(&idxs, &sim.atoms.positions);
     let velocities: Vec<[f64; 3]> = gather(&idxs, &sim.atoms.velocities);
 
-    send(Message::Idxs(idxs));
-    send(Message::Types(types));
-    send(Message::Float(masses));
-    send(Message::Float3(positions));
-    send(Message::Float3(velocities));
+    send(AtomMessage::Idxs(idxs));
+    send(AtomMessage::Types(types));
+    send(AtomMessage::Float(masses));
+    send(AtomMessage::Float3(positions));
+    send(AtomMessage::Float3(velocities));
 }
 
 fn update_ghost_atoms(

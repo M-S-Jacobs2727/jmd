@@ -1,17 +1,7 @@
-use crate::{
-    output::{Cumulation, OutputFormat},
-    Simulation,
-};
+use crate::Simulation;
 
-use super::{compute_local_ke, Compute, ComputeValue};
+use super::kinetic_energy;
 
-pub struct Temperature {}
-
-impl Compute for Temperature {
-    fn output_format(&self) -> OutputFormat {
-        OutputFormat::new("KE", Cumulation::Sum)
-    }
-    fn compute(&self, sim: &Simulation) -> ComputeValue {
-        ComputeValue::Float(compute_local_ke(sim) / sim.atoms.num_atoms() as f64)
-    }
+pub(super) fn compute(sim: &Simulation) -> f64 {
+    kinetic_energy::compute(sim) / sim.atoms.num_atoms() as f64
 }

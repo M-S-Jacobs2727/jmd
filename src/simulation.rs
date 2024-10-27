@@ -1,12 +1,14 @@
 use std::thread;
 
 use crate::{
-    atomic, compute, output,
+    atomic,
+    compute::{self, ComputeTrait},
+    output::{self, Value},
     parallel::{comm, message as msg, Domain, Worker},
     utils::KeyedVec,
     Atoms, Axis, Container, Error, NeighborList, OutputSpec, BC,
 };
-type ComputeVec = KeyedVec<String, Box<dyn compute::Compute>>;
+type ComputeVec = KeyedVec<String, compute::Compute>;
 
 pub struct Simulation<'a> {
     pub atoms: Atoms,
@@ -89,10 +91,7 @@ impl<'a> Simulation<'a> {
         for o in &output.values {
             match o {
                 OutputSpec::Step => {}
-                OutputSpec::KineticE => self.add_compute("KE", compute::KineticEnergy {}),
-                OutputSpec::PotentialE => self.add_compute("PE", compute::PotentialEnergy {}),
-                OutputSpec::Temp => self.add_compute("Temp", compute::Temperature {}),
-                OutputSpec::TotalE => self.add_compute("E", compute::TotalEnergy {}),
+                OutputSpec::Compute(c) => {}
             }
         }
         self.domain
@@ -101,8 +100,8 @@ impl<'a> Simulation<'a> {
     pub(crate) fn increment_nlocal(&mut self) {
         self.nlocal += 1;
     }
-    pub fn add_compute(&mut self, id: &str, compute: impl compute::Compute + 'static) {
-        self.computes.add(String::from(id), Box::new(compute));
+    pub fn add_compute(&mut self, id: &str, compute: compute::Compute) {
+        self.computes.add(String::from(id), compute);
     }
 
     pub(crate) fn forward_comm(&mut self) {
@@ -148,17 +147,8 @@ impl<'a> Simulation<'a> {
 
         for v in &self.output.values {
             let value = match v {
-                output::OutputSpec::Step => compute::ComputeValue::Usize(*step),
-                output::OutputSpec::Temp => {
-                    self.computes().get(&String::from("Temp")).compute(self)
-                }
-                output::OutputSpec::KineticE => {
-                    self.computes().get(&String::from("KE")).compute(self)
-                }
-                output::OutputSpec::PotentialE => {
-                    self.computes().get(&String::from("PE")).compute(self)
-                }
-                output::OutputSpec::TotalE => self.computes().get(&String::from("E")).compute(self),
+                output::OutputSpec::Step => Value::Usize(*step),
+                output::OutputSpec::Compute(c) => c.compute(&self),
             };
             self.domain
                 .send_to_main(msg::W2M::Output(thread::current().id(), value));

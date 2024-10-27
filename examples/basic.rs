@@ -1,4 +1,7 @@
-use jmd::{self, atomic::AtomicPotential, Integrator, Lattice, UpdateSettings};
+use jmd::{
+    self, atomic::AtomicPotential, compute::Compute, Integrator, Lattice, OutputSpec,
+    UpdateSettings,
+};
 fn run(simulation: &mut jmd::Simulation) -> Result<(), jmd::Error> {
     let lattice = jmd::Cubic::from_density(0.8);
     let rect = jmd::Rect::from_lattice(&lattice, [10, 10, 10]);
@@ -18,18 +21,18 @@ fn run(simulation: &mut jmd::Simulation) -> Result<(), jmd::Error> {
     simulation.set_atomic_potential(lj);
 
     let mut nl = jmd::NeighborList::new(simulation.container(), force_distance, 0.3);
-    dbg!(&nl);
+    // dbg!(&nl);
     nl.set_update_settings(UpdateSettings::new(10, 0, true));
     simulation.set_neighbor_list(nl);
 
     let output = jmd::Output {
         every: 50,
         values: vec![
-            jmd::OutputSpec::Step,
-            jmd::OutputSpec::Temp,
-            jmd::OutputSpec::KineticE,
-            jmd::OutputSpec::PotentialE,
-            jmd::OutputSpec::TotalE,
+            OutputSpec::Step,
+            OutputSpec::Compute(Compute::Temperature),
+            OutputSpec::Compute(Compute::KineticE),
+            OutputSpec::Compute(Compute::PotentialE),
+            OutputSpec::Compute(Compute::TotalE),
         ],
     };
     simulation.set_output(output);

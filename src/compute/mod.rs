@@ -1,46 +1,54 @@
-use std::{fmt::Display, ops::AddAssign};
+use crate::{
+    output::{Operation, Value},
+    Simulation,
+};
 
-use crate::{output::OutputFormat, Simulation};
-
+mod avg_vsq;
 mod kinetic_energy;
 mod potential_energy;
 mod temperature;
 mod total_energy;
 
-use kinetic_energy::compute_local_ke;
-pub use kinetic_energy::KineticEnergy;
-pub use potential_energy::PotentialEnergy;
-pub use temperature::Temperature;
-pub use total_energy::TotalEnergy;
-
-pub enum ComputeValue {
-    Float(f64),
-    Int(i32),
-    Usize(usize),
-    Bool(bool),
+#[derive(Debug, Clone, PartialEq)]
+pub enum Compute {
+    AvgVsq,
+    KineticE,
+    PotentialE,
+    Temperature,
+    TotalE,
 }
-impl AddAssign for ComputeValue {
-    fn add_assign(&mut self, rhs: Self) {
-        match (self, rhs) {
-            (ComputeValue::Float(i), ComputeValue::Float(j)) => *i += j,
-            (ComputeValue::Int(i), ComputeValue::Int(j)) => *i += j,
-            (ComputeValue::Usize(i), ComputeValue::Usize(j)) => *i += j,
-            _ => panic!("Mismatched types"),
-        }
-    }
-}
-impl Display for ComputeValue {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl ComputeTrait for Compute {
+    fn compute(&self, sim: &Simulation) -> Value {
         match self {
-            ComputeValue::Float(v) => v.fmt(f),
-            ComputeValue::Int(v) => v.fmt(f),
-            ComputeValue::Usize(v) => v.fmt(f),
-            ComputeValue::Bool(v) => v.fmt(f),
+            Compute::AvgVsq => Value::Float(avg_vsq::compute(sim)),
+            Compute::KineticE => Value::Float(kinetic_energy::compute(sim)),
+            Compute::PotentialE => Value::Float(potential_energy::compute(sim)),
+            Compute::Temperature => Value::Float(temperature::compute(sim)),
+            Compute::TotalE => Value::Float(total_energy::compute(sim)),
+        }
+    }
+    fn name(&self) -> &str {
+        match self {
+            Compute::AvgVsq => "AvgVsq",
+            Compute::KineticE => "KineticE",
+            Compute::PotentialE => "PotentialE",
+            Compute::Temperature => "Temperature",
+            Compute::TotalE => "TotalE",
+        }
+    }
+    fn op(&self) -> Operation {
+        match self {
+            Compute::AvgVsq
+            | Compute::KineticE
+            | Compute::PotentialE
+            | Compute::Temperature
+            | Compute::TotalE => Operation::Sum,
         }
     }
 }
 
-pub trait Compute {
-    fn compute(&self, sim: &Simulation) -> ComputeValue;
-    fn output_format(&self) -> OutputFormat;
+pub trait ComputeTrait {
+    fn compute(&self, sim: &Simulation) -> Value;
+    fn name(&self) -> &str;
+    fn op(&self) -> Operation;
 }
