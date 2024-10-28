@@ -3,7 +3,7 @@ use std::{sync::mpsc, thread};
 use crate::{
     atom_type::AtomType,
     output::{OutputSpec, Value},
-    Atoms, Container, Error,
+    Atoms, Container,
 };
 
 use super::Worker;
@@ -19,7 +19,6 @@ pub enum AtomMessage {
 
 /// Worker-to-Manager messages
 pub enum W2M<T: AtomType> {
-    Error(Error),
     Complete,
     Output(thread::ThreadId, Value),
     Dump(Atoms<T>, Container),
@@ -32,9 +31,8 @@ pub enum W2M<T: AtomType> {
 
 /// Manager-to-Worker messages
 pub enum M2W<T: AtomType> {
-    Error(Error),
     Setup(Vec<thread::ThreadId>),
-    Run(fn(&Worker<T>) -> Result<(), Error>),
+    Run(fn(&Worker<T>) -> ()),
     Sender(Option<mpsc::Sender<AtomMessage>>),
     ProcDims([usize; 3]),
 }

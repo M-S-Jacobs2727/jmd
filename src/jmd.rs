@@ -2,12 +2,12 @@ use std::thread;
 use std::{sync::mpsc, time::Duration};
 
 use crate::atom_type::AtomType;
-use crate::{output::*, parallel::message as msg, parallel::Worker, Error};
+use crate::{output::*, parallel::message as msg, parallel::Worker};
 
 struct ThreadContainer<T: AtomType> {
     pub id: thread::ThreadId,
     pub tx: mpsc::Sender<msg::M2W<T>>,
-    pub handle: thread::JoinHandle<Result<(), Error>>,
+    pub handle: thread::JoinHandle<()>,
 }
 
 /// Main app, used to run a function through parallel workers
@@ -113,9 +113,8 @@ where
         message: msg::W2M<T>,
         threads_complete: &mut usize,
         output_spec: &mut Vec<OutputSpec>,
-    ) -> Result<(), Error> {
+    ) {
         match message {
-            msg::W2M::Error(e) => return Err(e),
             msg::W2M::Complete => *threads_complete += 1,
             msg::W2M::ProcDims(pd) => {
                 for t in &self.threads {
@@ -128,22 +127,21 @@ where
             msg::W2M::InitialOutput => self.initial_output(output_spec),
             _ => {}
         };
-        Ok(())
     }
-    fn manage_comm(&self) -> Result<(), Error> {
+    fn manage_comm(&self) {
         let mut threads_complete = 0usize;
         let mut output_spec: Vec<OutputSpec> = Vec::new();
         loop {
             let result = self.rx.recv_timeout(Duration::from_millis(200));
             match result {
                 Ok(message) => {
-                    self.handle_message(message, &mut threads_complete, &mut output_spec)?
+                    self.handle_message(message, &mut threads_complete, &mut output_spec)
                 }
                 Err(mpsc::RecvTimeoutError::Disconnected) => panic!("Thread disconnected"),
                 _ => {}
             };
             if threads_complete == self.threads.len() {
-                return Ok(());
+                return;
             }
             for t in &self.threads {
                 if t.handle.is_finished() {
@@ -152,16 +150,12 @@ where
             }
         }
     }
-    pub fn run(
-        &mut self,
-        num_threads: usize,
-        f: fn(&Worker<T>) -> Result<(), Error>,
-    ) -> Result<(), Error> {
+    pub fn run(&mut self, num_threads: usize, f: fn(&Worker<T>) -> ()) {
         self.setup(num_threads);
         for thread in &self.threads {
             thread.tx.send(msg::M2W::Run(f)).unwrap();
         }
-        self.manage_comm()
+        self.manage_comm();
     }
 
     fn initial_output(&self, output_spec: &Vec<OutputSpec>) {

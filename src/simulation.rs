@@ -6,8 +6,8 @@ use crate::{
     compute::{self, ComputeTrait},
     output::{self, Value},
     parallel::{comm, message as msg, Domain, Worker},
-    utils::KeyedVec,
-    Atoms, Axis, Container, Error, NeighborList, Output, OutputSpec, UpdateSettings,
+    utils::{KeyError, KeyedVec},
+    Atoms, Axis, Container, NeighborList, Output, OutputSpec, UpdateSettings,
 };
 type ComputeVec = KeyedVec<String, compute::Compute>;
 
@@ -50,7 +50,7 @@ where
     }
 
     /// Initializes the simulation from a worker thread
-    pub fn connect(&mut self, worker: Box<&'a Worker<T>>) -> Result<(), crate::Error> {
+    pub fn connect(&mut self, worker: Box<&'a Worker<T>>) {
         self.domain.init(&self.container, worker)
     }
 
@@ -76,7 +76,7 @@ where
     pub fn computes(&self) -> &ComputeVec {
         &self.computes
     }
-    pub fn get_compute(&self, id: &str) -> Result<&compute::Compute, Error> {
+    pub fn get_compute(&self, id: &str) -> Result<&compute::Compute, KeyError> {
         self.computes.get(&String::from(id))
     }
 
@@ -96,38 +96,36 @@ where
     pub fn set_domain(&mut self, domain: Domain<'a, T>) {
         self.domain = domain;
     }
-    pub fn set_output(&mut self, every: usize, output_keys: Vec<&str>) -> Result<(), Error> {
-        let mut output_specs: Vec<OutputSpec> = Vec::new();
-        output_specs.reserve(output_keys.len());
-        for key in output_keys {
-            if key == "step" {
-                output_specs.push(OutputSpec::Step);
-            } else if self.computes.contains(&String::from(key)) {
-                let result = self.get_compute(key);
-                match result {
-                    Ok(c) => output_specs.push(OutputSpec::Compute(c.clone())),
-                    Err(e) => return Err(e),
+    pub fn set_output(&mut self, every: usize, output_keys: Vec<&str>) {
+        let output_specs: Vec<OutputSpec> = output_keys
+            .iter()
+            .map(|&key| {
+                if key == "step" {
+                    OutputSpec::Step
+                } else {
+                    let c = self.get_compute(key).expect("Invalid compute id");
+                    OutputSpec::Compute(c.clone())
                 }
-            } else {
-                return Err(Error::OtherError);
-            }
-        }
+            })
+            .collect();
+
         self.domain
             .send_to_main(msg::W2M::SetupOutput(self.output.values.clone()));
         self.output = Output {
             every,
             values: output_specs,
         };
-        Ok(())
     }
     pub(crate) fn increment_nlocal(&mut self) {
         self.atoms.nlocal += 1;
     }
-    pub fn add_compute(&mut self, id: &str, compute: compute::Compute) -> Result<(), Error> {
+    pub fn add_compute(&mut self, id: &str, compute: compute::Compute) {
         self.computes.add(String::from(id), compute)
     }
     pub fn set_atom_types(&mut self, atom_types: Vec<T>) {
-        self.atoms.set_atom_types(atom_types)
+        let num_types = atom_types.len();
+        self.atoms.set_atom_types(atom_types);
+        self.atomic_potential.set_num_types(num_types);
     }
 
     pub(crate) fn forward_comm(&mut self) {

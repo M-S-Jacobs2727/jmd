@@ -1,6 +1,7 @@
-use std::iter::Zip;
+use std::{fmt::Debug, iter::Zip};
 
-use crate::Error;
+#[derive(Debug)]
+pub struct KeyError {}
 
 #[derive(Debug)]
 pub struct KeyedVec<K, V>
@@ -12,7 +13,7 @@ where
 }
 impl<K, V> KeyedVec<K, V>
 where
-    K: PartialEq,
+    K: PartialEq + Debug,
 {
     pub fn new() -> Self {
         Self {
@@ -20,21 +21,18 @@ where
             values: Vec::new(),
         }
     }
-    pub fn add(&mut self, key: K, value: V) -> Result<(), Error> {
+    pub fn add(&mut self, key: K, value: V) {
         let idx = self.keys.iter().position(|k| *k == key);
-        if let Some(_) = idx {
-            return Err(Error::OtherError);
-        }
+        assert!(idx.is_none(), "Key {:?} already exists in KeyedVec", key);
         self.keys.push(key);
         self.values.push(value);
-        Ok(())
     }
 
-    pub(crate) fn get(&self, key: &K) -> Result<&V, Error> {
+    pub(crate) fn get(&self, key: &K) -> Result<&V, KeyError> {
         let idx = self.keys.iter().position(|k| *k == *key);
         match idx {
             Some(i) => Ok(&self.values[i]),
-            None => Err(Error::OtherError),
+            None => Err(KeyError {}),
         }
     }
     pub(crate) fn index(&self, idx: usize) -> &V {

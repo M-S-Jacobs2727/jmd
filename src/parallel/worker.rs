@@ -3,7 +3,7 @@ use std::{
     thread::{self, ThreadId},
 };
 
-use crate::{atom_type::AtomType, parallel::message as msg, Error};
+use crate::{atom_type::AtomType, parallel::message as msg};
 
 /// Channels for communication between each process and the manager
 pub struct Worker<T: AtomType> {
@@ -19,7 +19,7 @@ impl<T: AtomType> Worker<T> {
             thread_ids: Vec::new(),
         }
     }
-    pub fn run_thread(&mut self) -> Result<(), Error> {
+    pub fn run_thread(&mut self) {
         self.tx
             .send(msg::W2M::Id(thread::current().id()))
             .expect("Disconnect error");
@@ -31,7 +31,7 @@ impl<T: AtomType> Worker<T> {
                 panic!("Invalid communication")
             };
 
-        self.run()
+        self.run();
     }
     pub fn thread_ids(&self) -> &Vec<ThreadId> {
         &self.thread_ids
@@ -45,21 +45,12 @@ impl<T: AtomType> Worker<T> {
     pub fn try_recv(&self) -> Result<msg::M2W<T>, mpsc::TryRecvError> {
         self.rx.try_recv()
     }
-    pub fn error(&self, e: Error) {
-        self.send(msg::W2M::Error(e));
-    }
 
-    fn run(&self) -> Result<(), Error> {
+    fn run(&self) {
         let msg = self.rx.recv().unwrap();
-        let res = match msg {
+        match msg {
             msg::M2W::Run(f) => f(self),
-            msg::M2W::Error(_) => Err(Error::OtherError),
             _ => panic!("Invalid communication"),
         };
-        match res {
-            Ok(_) => self.tx.send(msg::W2M::Complete).unwrap(),
-            Err(e) => self.tx.send(msg::W2M::Error(e)).unwrap(),
-        }
-        res
     }
 }

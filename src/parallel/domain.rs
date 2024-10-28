@@ -9,7 +9,7 @@ use crate::{
     atom_type::AtomType,
     region::Rect,
     utils::{indices::Index, Direction},
-    Container, Error, NeighborList,
+    Container, NeighborList,
 };
 
 /// Determine and return the best configuration of processes to
@@ -66,11 +66,7 @@ impl<'a, T: AtomType> Domain<'a, T> {
             proc_location: Index::new(),
         }
     }
-    pub(crate) fn init(
-        &mut self,
-        container: &Container,
-        worker: Box<&'a Worker<T>>,
-    ) -> Result<(), Error> {
+    pub(crate) fn init(&mut self, container: &Container, worker: Box<&'a Worker<T>>) {
         self.worker = Some(worker);
 
         let num_threads = self.thread_ids().len();
@@ -86,12 +82,12 @@ impl<'a, T: AtomType> Domain<'a, T> {
 
         self.reset_subdomain(container);
 
-        self.setup_neighbor(Direction::Xlo, container)?;
-        self.setup_neighbor(Direction::Xhi, container)?;
-        self.setup_neighbor(Direction::Ylo, container)?;
-        self.setup_neighbor(Direction::Yhi, container)?;
-        self.setup_neighbor(Direction::Zlo, container)?;
-        self.setup_neighbor(Direction::Zhi, container)
+        self.setup_neighbor(Direction::Xlo, container);
+        self.setup_neighbor(Direction::Xhi, container);
+        self.setup_neighbor(Direction::Ylo, container);
+        self.setup_neighbor(Direction::Yhi, container);
+        self.setup_neighbor(Direction::Zlo, container);
+        self.setup_neighbor(Direction::Zhi, container);
     }
     pub(crate) fn subdomain(&self) -> &Rect {
         &self.subdomain
@@ -99,7 +95,7 @@ impl<'a, T: AtomType> Domain<'a, T> {
     pub(crate) fn worker(&self) -> &Box<&'a Worker<T>> {
         self.worker.as_ref().expect("Must init")
     }
-    fn setup_neighbor(&mut self, direction: Direction, container: &Container) -> Result<(), Error> {
+    fn setup_neighbor(&mut self, direction: Direction, container: &Container) {
         // Get index of neighbor (3d then 1d), if neighbor is present, send Option<mpsc::Sender> to main with proc idx, otherwise None and 0
         // Receive from main Option<mpsc::Sender> for opposite neighbor
         let idx = self.get_neighbor(direction.clone(), container);
@@ -112,12 +108,11 @@ impl<'a, T: AtomType> Domain<'a, T> {
         match msg {
             Ok(msg::M2W::Sender(Some(sender))) => {
                 self.procs.set(direction.opposite(), sender);
-                Ok(())
             }
-            Ok(msg::M2W::Sender(None)) => Ok(()),
-            Ok(_) => Err(Error::OtherError),
-            _ => Err(Error::OtherError),
-        }
+            Ok(msg::M2W::Sender(None)) => {}
+            Ok(_) => panic!("Invalid message"),
+            _ => panic!("Diconnect Error"),
+        };
     }
     pub fn initialized(&self) -> bool {
         self.worker.is_some()

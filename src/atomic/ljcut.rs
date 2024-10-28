@@ -1,5 +1,5 @@
 use super::AtomicPotentialTrait;
-use crate::{atom_type::AtomType, Error};
+use crate::atom_type::AtomType;
 
 #[derive(Clone, Copy, Debug)]
 struct LJCutCoeff {
@@ -66,16 +66,15 @@ impl LJCut {
         sigma: f64,
         epsilon: f64,
         rcut: f64,
-    ) -> Result<(), Error> {
-        if typei >= self.num_types || typej >= self.num_types {
-            return Err(Error::AtomicPotentialError);
-        }
+    ) {
+        assert!(
+            typei < self.num_types && typej < self.num_types,
+            "Type indices should be less than the number of types (0-indexed)"
+        );
 
         let index = <Self as AtomicPotentialTrait<T>>::type_idx(self, typei, typej);
         self.coeff_set[index] = true;
         self.coeffs[index] = LJCutCoeff::new(sigma, epsilon, rcut);
-
-        Ok(())
     }
     pub fn all_set(&self) -> bool {
         self.coeff_set.iter().all(|&x| x)

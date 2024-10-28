@@ -108,3 +108,25 @@ impl Region for Rect {
         self.clone()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::Rect;
+    #[test]
+    fn test_bounds() {
+        let r = Rect::new(0.0, 1.0, 2.0, 3.0, 4.0, 5.0);
+        assert_eq!(r.xlo(), 0.0);
+        assert_eq!(r.xhi(), 1.0);
+        assert_eq!(r.ylo(), 2.0);
+        assert_eq!(r.yhi(), 3.0);
+        assert_eq!(r.zlo(), 4.0);
+        assert_eq!(r.zhi(), 5.0);
+
+        assert_eq!(r.lx(), 1.0);
+        assert_eq!(r.ly(), 1.0);
+        assert_eq!(r.lz(), 1.0);
+
+        assert_eq!(r.lo(), [0.0, 2.0, 4.0]);
+        assert_eq!(r.hi(), [1.0, 3.0, 5.0]);
+    }
+}

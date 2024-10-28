@@ -61,6 +61,8 @@ where
 
         simulation.forward_comm();
         simulation.build_neighbor_list();
+        dbg!(simulation.atoms.positions.len());
+        dbg!(simulation.neighbor_list().neighbors().len());
         let mut forces = simulation.compute_forces();
         simulation.reverse_comm(&mut forces);
         simulation.check_do_output(&0);
@@ -71,6 +73,8 @@ where
             simulation.forward_comm();
 
             simulation.check_build_neighbor_list(&step);
+            dbg!(simulation.atoms.positions.len());
+            dbg!(simulation.neighbor_list().neighbors().len());
 
             let mut forces = simulation.compute_forces();
             simulation.reverse_comm(&mut forces);

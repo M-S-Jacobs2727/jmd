@@ -1,6 +1,8 @@
+use std::fmt::Debug;
+
 use rand_distr::Distribution;
 
-use crate::{atom_type::AtomType, neighbor, region::Region, utils, Error};
+use crate::{atom_type::AtomType, neighbor, region::Region, utils};
 
 /// Atom properties during simulation, not including forces
 #[derive(Debug)]
@@ -41,8 +43,8 @@ impl<T: AtomType> Atoms<T> {
     pub fn velocities(&self) -> &Vec<[f64; 3]> {
         &self.velocities
     }
-    pub fn mass(&self, atom_type: usize) -> f64 {
-        self.atom_types[atom_type].mass()
+    pub fn mass(&self, idx: usize) -> f64 {
+        self.atom_types[self.types[idx]].mass()
     }
     pub fn atom_types(&self) -> &Vec<T> {
         &self.atom_types
@@ -71,10 +73,10 @@ impl<T: AtomType> Atoms<T> {
             .collect();
         let sort_indices = utils::get_sort_indices(&bin_indices);
 
-        utils::sort_atoms(&sort_indices, &mut self.ids, 0usize);
-        utils::sort_atoms(&sort_indices, &mut self.types, 0usize);
-        utils::sort_atoms(&sort_indices, &mut self.positions, [0.0f64, 0.0, 0.0]);
-        utils::sort_atoms(&sort_indices, &mut self.velocities, [0.0f64, 0.0, 0.0]);
+        utils::sort_atoms(&sort_indices, &mut self.ids);
+        utils::sort_atoms(&sort_indices, &mut self.types);
+        utils::sort_atoms(&sort_indices, &mut self.positions);
+        utils::sort_atoms(&sort_indices, &mut self.velocities);
 
         return self
             .positions
@@ -117,10 +119,9 @@ impl<T: AtomType> Atoms<T> {
             self.positions.push(coords[i])
         }
     }
-    pub fn set_temperature(&mut self, temperature: f64) -> Result<(), Error> {
+    pub fn set_temperature(&mut self, temperature: f64) {
         let mut rng = rand::thread_rng();
-        let dist =
-            rand_distr::Normal::new(0.0, temperature.sqrt()).map_err(|_e| Error::OtherError)?;
+        let dist = rand_distr::Normal::new(0.0, temperature.sqrt()).expect("Invalid temperature");
         let sqrt_ke: Vec<f64> = dist.sample_iter(&mut rng).take(self.nlocal * 3).collect();
         for i in 0..self.nlocal {
             self.velocities[i] = [
@@ -129,7 +130,6 @@ impl<T: AtomType> Atoms<T> {
                 sqrt_ke[3 * i + 2] / self.atom_types[self.types[i]].mass().sqrt(),
             ];
         }
-        Ok(())
     }
     pub fn remove_idxs(&mut self, atom_idxs: Vec<usize>) {
         let num_local = atom_idxs.iter().filter(|&i| *i < self.nlocal).count();
