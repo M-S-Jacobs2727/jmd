@@ -65,11 +65,11 @@ impl<T: AtomType> Atoms<T> {
     pub fn set_velocity(&mut self, i: usize, new_vel: [f64; 3]) {
         self.velocities[i] = new_vel;
     }
-    pub fn sort_atoms_by_bin(&mut self, bins: &neighbor::Grid) -> Vec<usize> {
+    pub fn sort_atoms_by_bin(&mut self, nl: &neighbor::NeighborList) -> Vec<usize> {
         let bin_indices = self
             .positions
             .iter()
-            .map(|coord| bins.coord_to_index(coord).idx())
+            .map(|coord| nl.coord_to_index(coord).idx())
             .collect();
         let sort_indices = utils::get_sort_indices(&bin_indices);
 
@@ -81,7 +81,7 @@ impl<T: AtomType> Atoms<T> {
         return self
             .positions
             .iter()
-            .map(|coord| bins.coord_to_index(coord).idx())
+            .map(|coord| nl.coord_to_index(coord).idx())
             .collect();
     }
     pub fn add_random_atoms(&mut self, region: &impl Region, num_atoms: usize, atom_type: usize) {

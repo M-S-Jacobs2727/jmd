@@ -243,7 +243,7 @@ where
 {
     let ids = gather_ghost_ids(
         sim,
-        &sim.domain().get_outer_rect(&direction, sim.neighbor_list()),
+        &sim.domain().get_outer_rect(&direction, &sim.neighbor_list),
     );
     let mut send_forces: Vec<[f64; 3]> = Vec::new();
     send_forces.reserve(ids.len());
@@ -275,7 +275,7 @@ where
 {
     let idxs = gather_owned_idxs(
         sim,
-        &sim.domain().get_inner_rect(&direction, sim.neighbor_list()),
+        &sim.domain().get_inner_rect(&direction, &sim.neighbor_list),
     );
     fn gather<T: Copy>(idxs: &Vec<usize>, vec: &Vec<T>) -> Vec<T> {
         idxs.iter().map(|i| vec[*i]).collect()

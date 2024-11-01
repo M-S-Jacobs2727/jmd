@@ -1,11 +1,13 @@
-use super::{Grid, UpdateSettings};
+use std::rc::Rc;
+
+use super::Grid;
 use crate::{
     utils::{computations::distance_squared, indices::Index},
     Container,
 };
 
-fn compute_stencil(bin_size: f64, cutoff_distance: f64) -> Vec<[i32; 3]> {
-    let max_number_out = (cutoff_distance / bin_size).ceil() as i32;
+fn compute_stencil(bin_size: f64, neighbor_distance: f64) -> Vec<[i32; 3]> {
+    let max_number_out = (neighbor_distance / bin_size).ceil() as i32;
     let mut stencil: Vec<[i32; 3]> = Vec::new();
     for i in 0..max_number_out + 1 {
         stencil.push([i, 0, 0]);
@@ -15,7 +17,7 @@ fn compute_stencil(bin_size: f64, cutoff_distance: f64) -> Vec<[i32; 3]> {
             let i2 = (i.abs() - 1).max(0);
             let j2 = (j.abs() - 1).max(0);
             let min_dist = ((i2 * i2 + j2 * j2) as f64).sqrt();
-            if min_dist < cutoff_distance {
+            if min_dist < neighbor_distance {
                 stencil.push([i, j, 0]);
             }
         }
@@ -27,7 +29,7 @@ fn compute_stencil(bin_size: f64, cutoff_distance: f64) -> Vec<[i32; 3]> {
                 let j2 = (j.abs() - 1).max(0);
                 let k2 = (k.abs() - 1).max(0);
                 let min_dist = ((i2 * i2 + j2 * j2 + k2 * k2) as f64).sqrt();
-                if min_dist < cutoff_distance {
+                if min_dist < neighbor_distance {
                     stencil.push([i, j, k]);
                 }
             }
@@ -40,21 +42,25 @@ fn compute_stencil(bin_size: f64, cutoff_distance: f64) -> Vec<[i32; 3]> {
 #[derive(Debug)]
 pub struct NeighborList {
     grid: Grid,
-    force_distance: f64,
-    skin_distance: f64,
     stencil: Vec<[i32; 3]>,
     neighbors: Vec<Vec<usize>>,
+    force_distance: f64,
+    skin_distance: f64,
     is_built: bool,
-    pub update_settings: UpdateSettings,
+    every: usize,
+    delay: usize,
+    check: bool,
+    last_update_step: usize,
 }
 impl NeighborList {
     pub fn new(
-        container: &Container,
+        container: Rc<Container>,
         force_distance: f64,
         skin_distance: f64,
-        update_settings: UpdateSettings,
+        every: usize,
+        delay: usize,
+        check: bool,
     ) -> Self {
-        let neighbors: Vec<Vec<usize>> = Vec::new();
         assert!(
             force_distance > 0.0,
             "Force cutoff distance ({}) must be positive",
@@ -65,19 +71,22 @@ impl NeighborList {
             "Neighbor skin distance ({}) must be positive",
             skin_distance
         );
-        let cutoff_distance = skin_distance + force_distance;
-        let bin_size = cutoff_distance * 0.5;
-        let grid = Grid::new(container, bin_size, cutoff_distance);
-        let stencil = compute_stencil(bin_size, cutoff_distance);
+        let neighbor_distance = skin_distance + force_distance;
+        let bin_size = neighbor_distance * 0.5;
+        let stencil = compute_stencil(bin_size, neighbor_distance);
+        let grid = Grid::new(container, bin_size, neighbor_distance);
         // dbg!(&grid);
         Self {
             grid,
+            stencil,
+            neighbors: Vec::new(),
             force_distance,
             skin_distance,
-            stencil,
-            neighbors,
             is_built: false,
-            update_settings,
+            every,
+            delay,
+            check,
+            last_update_step: 0,
         }
     }
 
@@ -91,42 +100,74 @@ impl NeighborList {
     pub fn skin_distance(&self) -> f64 {
         self.skin_distance
     }
-    pub fn neighbor_distance(&self) -> f64 {
+    pub fn max_neighbor_distance(&self) -> f64 {
         self.skin_distance + self.force_distance
-    }
-    pub fn grid(&self) -> &Grid {
-        &self.grid
-    }
-    pub fn update_settigs(&self) -> &UpdateSettings {
-        &self.update_settings
     }
     pub fn is_built(&self) -> bool {
         self.is_built
     }
+    pub fn every(&self) -> usize {
+        self.every
+    }
+    pub fn delay(&self) -> usize {
+        self.delay
+    }
+    pub fn check(&self) -> bool {
+        self.check
+    }
 
     // Setters
-    pub fn set_grid(&mut self, grid: Grid) {
-        self.is_built = false;
-        self.grid = grid
+    pub fn set_bin_size(&mut self, bin_size: f64) {
+        self.grid.set_bin_size(bin_size);
+        self.stencil = compute_stencil(bin_size, self.max_neighbor_distance());
     }
     pub fn set_skin_distance(&mut self, skin_distance: f64) {
         if skin_distance <= 0.0 {
             panic!("Skin distance must be positive, found {}", skin_distance);
         }
-        self.is_built = false;
         self.skin_distance = skin_distance;
+        self.is_built = false;
+        let bin_size = self.grid.bin_size();
+        self.grid
+            .set_neighbor_distance(self.max_neighbor_distance());
+        self.stencil = compute_stencil(bin_size, self.max_neighbor_distance());
     }
-    pub fn set_update_settings(&mut self, update_settings: UpdateSettings) {
-        self.update_settings = update_settings
+    pub fn set_every(&mut self, every: usize) {
+        self.every = every;
+    }
+    pub fn set_delay(&mut self, delay: usize) {
+        self.delay = delay;
+    }
+    pub fn set_check(&mut self, check: bool) {
+        self.check = check;
+    }
+    pub fn set_update(&mut self, every: usize, delay: usize, check: bool) {
+        self.every = every;
+        self.delay = delay;
+        self.check = check;
+    }
+    pub(crate) fn set_force_distance(&mut self, force_distance: f64) {
+        self.force_distance = force_distance;
+        self.is_built = false;
+        let bin_size = self.grid.bin_size();
+        self.grid
+            .set_neighbor_distance(self.max_neighbor_distance());
+        self.stencil = compute_stencil(bin_size, self.max_neighbor_distance());
     }
 
+    pub fn should_update(&self, step: usize) -> bool {
+        (step % self.every == 0) && (step - self.last_update_step >= self.delay)
+    }
+    pub fn coord_to_index(&self, coord: &[f64; 3]) -> Index {
+        self.grid.coord_to_index(coord)
+    }
     pub fn update(&mut self, positions: &Vec<[f64; 3]>) {
         self.is_built = true;
         let num_atoms = positions.len();
 
         self.neighbors.clear();
         self.neighbors.resize(num_atoms, Vec::new());
-        let neigh_dist_sq = self.neighbor_distance() * self.neighbor_distance();
+        let neigh_dist_sq = self.max_neighbor_distance() * self.max_neighbor_distance();
 
         // dbg!(positions);
         let atom_indices_per_bin = self.bin_atoms(&positions);
@@ -145,7 +186,9 @@ impl NeighborList {
                     &self.grid.num_bins(),
                 );
                 for &neigh_idx in &atom_indices_per_bin[comp_bin.idx()] {
-                    if distance_squared(&positions[neigh_idx], pos) < neigh_dist_sq {
+                    if distance_squared(&positions[neigh_idx], pos) < neigh_dist_sq
+                        && neigh_idx != i
+                    {
                         self.neighbors[i].push(neigh_idx);
                     }
                 }
@@ -167,5 +210,82 @@ impl NeighborList {
                 atom_indices_per_bin[bin_idx.idx()].push(atom_idx)
             });
         atom_indices_per_bin
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::BC;
+
+    fn setup_nl() -> NeighborList {
+        let container = Container::new(0.0, 10.0, 0.0, 10.0, 0.0, 10.0, BC::PP, BC::PP, BC::PP);
+        NeighborList::new(Rc::new(container), 2.0, 1.0, 1, 0, true)
+    }
+
+    #[test]
+    fn test_single_atom() {
+        let mut nl = setup_nl();
+        nl.update(&vec![[1.0, 1.0, 1.0]]);
+        assert_eq!(nl.neighbors()[0], vec![]);
+    }
+
+    #[test]
+    fn test_two_atoms() {
+        let mut nl = setup_nl();
+        nl.update(&vec![[1.0, 1.0, 1.0], [1.0, 1.0, 2.0]]);
+        let neighbors = nl.neighbors();
+        assert_eq!(neighbors[0], vec![1]);
+        assert_eq!(neighbors[1], vec![]); // half neighbor list
+    }
+
+    #[test]
+    fn test_two_atoms_far() {
+        let mut nl = setup_nl();
+        nl.update(&vec![[1.0, 1.0, 1.0], [1.0, 1.0, 9.0]]);
+        let neighbors = nl.neighbors();
+        assert_eq!(neighbors[0], vec![]);
+        assert_eq!(neighbors[1], vec![]);
+    }
+
+    #[test]
+    fn test_four_atoms() {
+        let mut nl = setup_nl();
+        let pos = vec![
+            [1.0, 1.0, 1.0],
+            [1.0, 1.0, 9.0],
+            [1.0, 2.0, 1.0],
+            [1.0, 3.0, 9.0],
+        ];
+        dbg!(&nl.grid);
+
+        nl.update(&pos);
+        let neighbors = nl.neighbors();
+        assert_eq!(neighbors[0], vec![2]);
+        assert_eq!(neighbors[1], vec![3]);
+        assert_eq!(neighbors[2], vec![]);
+        assert_eq!(neighbors[3], vec![]);
+
+        let bins = nl.bin_atoms(&pos);
+        let filled_bins: Vec<(usize, &Vec<usize>)> = bins
+            .iter()
+            .enumerate()
+            .filter(|(_i, b)| !b.is_empty())
+            .collect();
+        dbg!(&filled_bins);
+        let occupied_bins = vec![
+            (3usize * 121 + 3 * 11 + 3, 0usize),
+            (3usize * 121 + 3 * 11 + 7, 1usize),
+            (3usize * 121 + 3 * 11 + 3, 2usize),
+            (3usize * 121 + 3 * 11 + 7, 3usize),
+        ];
+        bins.iter().enumerate().for_each(|(i, b)| {
+            let res = occupied_bins.iter().find(|(j, _idx)| i == *j);
+            let v = match res {
+                Some((_j, idx)) => vec![*idx],
+                None => vec![],
+            };
+            assert_eq!(v, *b);
+        });
     }
 }

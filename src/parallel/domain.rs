@@ -142,7 +142,7 @@ impl<'a, T: AtomType> Domain<'a, T> {
     }
 
     pub fn get_inner_rect(&self, direction: &Direction, neighbor_list: &NeighborList) -> Rect {
-        let dist = neighbor_list.neighbor_distance();
+        let dist = neighbor_list.max_neighbor_distance();
         let half_skin = neighbor_list.skin_distance() * 0.5;
 
         match direction {
@@ -198,7 +198,7 @@ impl<'a, T: AtomType> Domain<'a, T> {
     }
 
     pub fn get_outer_rect(&self, direction: &Direction, neighbor_list: &NeighborList) -> Rect {
-        let dist = neighbor_list.neighbor_distance();
+        let dist = neighbor_list.max_neighbor_distance();
         let half_skin = neighbor_list.skin_distance() * 0.5;
 
         match direction {

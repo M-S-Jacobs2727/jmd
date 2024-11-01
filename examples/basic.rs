@@ -24,7 +24,8 @@ fn run(worker: &Worker<Basic>) {
         .mut_atomic_potential()
         .set_coeff::<Basic>(0, 0, 1.0, 1.0, 2.5);
 
-    simulation.set_neighbor_list(0.3, UpdateSettings::new(10, 0, true));
+    simulation.neighbor_list.set_skin_distance(0.3);
+    simulation.neighbor_list.set_update(10, 0, true);
 
     simulation.add_compute("AvgVsq", Compute::AvgVsq);
     simulation.add_compute("Temperature", Compute::Temperature);

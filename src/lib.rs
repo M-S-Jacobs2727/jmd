@@ -26,7 +26,7 @@ pub use container::{Container, BC};
 pub use integrators::*;
 pub use jmd::Jmd;
 pub use lattice::*;
-pub use neighbor::{NeighborList, UpdateSettings};
+pub use neighbor::NeighborList;
 pub use output::{Output, OutputSpec};
 pub use parallel::Worker;
 pub use region::*;
