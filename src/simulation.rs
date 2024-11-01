@@ -7,7 +7,7 @@ use crate::{
     output::{self, Value},
     parallel::{comm, message as msg, Domain, Worker},
     utils::{KeyError, KeyedVec},
-    Atoms, Axis, Container, NeighborList, Output, OutputSpec,
+    Atoms, Axis, Container, Integrator, NeighborList, Output, OutputSpec, Verlet,
 };
 type ComputeVec = KeyedVec<String, compute::Compute>;
 
@@ -24,13 +24,20 @@ where
     output: output::Output,
     pos_at_prev_neigh_build: Vec<[f64; 3]>,
     computes: ComputeVec,
+    timestep: f64,
+    forces: Vec<[f64; 3]>,
 }
 impl<'a, T, A> Simulation<'a, T, A>
 where
     T: AtomType,
     A: atomic::AtomicPotentialTrait<T>,
 {
-    pub fn new(atoms: Atoms<T>, atomic_potential: A, container: Container) -> Self {
+    pub fn new(timestep: f64, atoms: Atoms<T>, atomic_potential: A, container: Container) -> Self {
+        assert!(
+            timestep > 0.0,
+            "Timestep should be positive, found {}",
+            timestep,
+        );
         let container = Rc::new(container);
         let neighbor_list = NeighborList::new(
             container.clone(),
@@ -49,6 +56,8 @@ where
             output: output::Output::new(),
             pos_at_prev_neigh_build: Vec::new(),
             computes: KeyedVec::new(),
+            timestep,
+            forces: Vec::new(),
         }
     }
 
@@ -78,6 +87,15 @@ where
     }
     pub fn get_compute(&self, id: &str) -> Result<&compute::Compute, KeyError> {
         self.computes.get(&String::from(id))
+    }
+    pub fn timestep(&self) -> f64 {
+        self.timestep
+    }
+    pub(crate) fn forces(&self) -> &Vec<[f64; 3]> {
+        &self.forces
+    }
+    pub(crate) fn mut_forces(&mut self) -> &mut Vec<[f64; 3]> {
+        &mut self.forces
     }
 
     // Setters
@@ -126,20 +144,78 @@ where
         }
         self.atomic_potential = atomic_potential;
     }
+    pub fn set_timestep(&mut self, timestep: f64) {
+        assert!(
+            timestep > 0.0,
+            "Timestep should be positive, found {}",
+            timestep,
+        );
+        self.timestep = timestep;
+    }
 
-    pub(crate) fn forward_comm(&mut self) {
+    // Other public functions
+    pub fn run(&mut self, num_steps: usize) {
+        self.pre_check();
+
+        self.initial_output();
+
+        self.pre_forward_comm();
+        self.forward_comm();
+        self.post_forward_comm();
+        self.build_neighbor_list();
+        dbg!(self.atoms.positions.len());
+        dbg!(self.neighbor_list.neighbors().len());
+        self.forces = self.compute_forces();
+        self.reverse_comm();
+        self.check_do_output(&0);
+
+        for step in 1..=num_steps {
+            self.pre_forward_comm();
+            self.forward_comm();
+            self.post_forward_comm();
+
+            self.check_build_neighbor_list(step);
+            dbg!(self.atoms.positions.len());
+            dbg!(self.neighbor_list.neighbors().len());
+
+            self.pre_force();
+            self.forces = self.compute_forces();
+            self.pre_reverse_comm();
+            self.reverse_comm();
+            self.post_reverse_comm();
+
+            self.check_do_output(&step);
+        }
+    }
+
+    // Communication functions
+    fn forward_comm(&mut self) {
         comm::forward_comm(self);
     }
-    pub(crate) fn reverse_comm(&self, forces: &mut Vec<[f64; 3]>) {
-        comm::reverse_comm(self, forces);
+    fn reverse_comm(&mut self) {
+        comm::reverse_comm(self);
     }
 
-    pub(crate) fn compute_forces(&self) -> Vec<[f64; 3]> {
+    // Run methods
+    fn pre_check(&self) {
+        assert!(
+            self.atomic_potential.all_set(),
+            "All atomic potential coefficients should be set before running"
+        );
+    }
+    fn pre_forward_comm(&mut self) {
+        Verlet::pre_forward_comm(self);
+    }
+    fn post_forward_comm(&mut self) {}
+    fn pre_force(&mut self) {}
+    fn pre_reverse_comm(&mut self) {}
+    fn post_reverse_comm(&mut self) {}
+    fn compute_forces(&self) -> Vec<[f64; 3]> {
         self.atomic_potential
             .compute_forces(&self.atoms, &self.neighbor_list)
     }
 
-    pub(crate) fn check_build_neighbor_list(&mut self, step: usize) {
+    fn check_build_neighbor_list(&mut self, step: usize) {
         if !self.neighbor_list.should_update(step) {
             return;
         }
@@ -149,7 +225,7 @@ where
         self.build_neighbor_list();
     }
 
-    pub(crate) fn build_neighbor_list(&mut self) {
+    fn build_neighbor_list(&mut self) {
         if !self.neighbor_list.is_built() {
             self.neighbor_list.update(self.atoms.positions());
         }
@@ -160,7 +236,7 @@ where
     }
 
     // TODO: Move to output
-    pub(crate) fn check_do_output(&self, step: &usize) {
+    fn check_do_output(&self, step: &usize) {
         if step % self.output.every != 0 {
             return;
         }
@@ -175,6 +251,7 @@ where
         }
     }
 
+    // Private functions
     fn atoms_moved_too_far(&self) -> bool {
         let half_skin_dist = self.neighbor_list.skin_distance() * 0.5;
         let opt = self
@@ -226,7 +303,7 @@ where
         }
     }
 
-    pub(crate) fn initial_output(&self) {
+    fn initial_output(&self) {
         self.domain().send_to_main_once(msg::W2M::InitialOutput);
     }
 }

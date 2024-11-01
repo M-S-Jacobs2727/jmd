@@ -25,4 +25,7 @@ impl<T: AtomType> AtomicPotentialTrait<T> for None_ {
     fn compute_potential_energy(&self, _atoms: &Atoms<T>, _neighbor_list: &NeighborList) -> f64 {
         0.0
     }
+    fn all_set(&self) -> bool {
+        true
+    }
 }

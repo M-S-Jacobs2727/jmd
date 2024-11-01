@@ -69,9 +69,6 @@ impl LJCut {
         self.coeff_set[index] = true;
         self.coeffs[index] = coeff.clone();
     }
-    fn all_set(&self) -> bool {
-        self.coeff_set.iter().all(|&x| x)
-    }
     fn default_coeff() -> LJCutCoeff {
         LJCutCoeff::new(0.0, 0.0, 0.0)
     }
@@ -235,5 +232,8 @@ impl<T: AtomType> AtomicPotentialTrait<T> for LJCut {
             self.coeffs.resize(new_len, LJCut::default_coeff());
             self.coeff_set.resize(new_len, false);
         }
+    }
+    fn all_set(&self) -> bool {
+        self.coeff_set.iter().all(|&x| x)
     }
 }

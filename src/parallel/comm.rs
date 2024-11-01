@@ -3,7 +3,7 @@ use crate::{
     Region, Simulation,
 };
 
-pub(crate) fn reverse_comm<T, A>(sim: &Simulation<T, A>, forces: &mut Vec<[f64; 3]>)
+pub(crate) fn reverse_comm<T, A>(sim: &mut Simulation<T, A>)
 where
     T: AtomType,
     A: AtomicPotentialTrait<T>,
@@ -11,31 +11,31 @@ where
     let mut sent_ids: Vec<usize> = Vec::new();
 
     // z-direction
-    let mut ids = send_reverse_comm(sim, forces, Direction::Zhi);
+    let mut ids = send_reverse_comm(sim, Direction::Zhi);
     sent_ids.append(&mut ids);
-    recv_reverse_comm(sim, forces);
+    recv_reverse_comm(sim);
 
-    let mut ids = send_reverse_comm(sim, forces, Direction::Zlo);
+    let mut ids = send_reverse_comm(sim, Direction::Zlo);
     sent_ids.append(&mut ids);
-    recv_reverse_comm(sim, forces);
+    recv_reverse_comm(sim);
 
     // y-direction
-    let mut ids = send_reverse_comm(sim, forces, Direction::Yhi);
+    let mut ids = send_reverse_comm(sim, Direction::Yhi);
     sent_ids.append(&mut ids);
-    recv_reverse_comm(sim, forces);
+    recv_reverse_comm(sim);
 
-    let mut ids = send_reverse_comm(sim, forces, Direction::Ylo);
+    let mut ids = send_reverse_comm(sim, Direction::Ylo);
     sent_ids.append(&mut ids);
-    recv_reverse_comm(sim, forces);
+    recv_reverse_comm(sim);
 
     // x-direction
-    let mut ids = send_reverse_comm(sim, forces, Direction::Xhi);
+    let mut ids = send_reverse_comm(sim, Direction::Xhi);
     sent_ids.append(&mut ids);
-    recv_reverse_comm(sim, forces);
+    recv_reverse_comm(sim);
 
-    let mut ids = send_reverse_comm(sim, forces, Direction::Xlo);
+    let mut ids = send_reverse_comm(sim, Direction::Xlo);
     sent_ids.append(&mut ids);
-    recv_reverse_comm(sim, forces);
+    recv_reverse_comm(sim);
 }
 
 pub(crate) fn forward_comm<T, A>(sim: &mut Simulation<T, A>)
@@ -143,7 +143,7 @@ where
     recv_atoms(sim);
 }
 
-fn recv_reverse_comm<T, A>(sim: &Simulation<T, A>, forces: &mut Vec<[f64; 3]>)
+fn recv_reverse_comm<T, A>(sim: &mut Simulation<T, A>)
 where
     T: AtomType,
     A: AtomicPotentialTrait<T>,
@@ -152,10 +152,10 @@ where
     let force_msg = sim.domain().receive();
     match (id_msg, force_msg) {
         (AtomMessage::Idxs(ids), AtomMessage::Float3(new_forces)) => {
-            accumulate_forces(sim, &ids, &new_forces, forces)
+            accumulate_forces(sim, &ids, &new_forces)
         }
         (AtomMessage::Float3(new_forces), AtomMessage::Idxs(ids)) => {
-            accumulate_forces(sim, &ids, &new_forces, forces)
+            accumulate_forces(sim, &ids, &new_forces)
         }
         _ => panic!("Invalid communication"),
     }
@@ -213,30 +213,23 @@ where
         .collect()
 }
 
-fn accumulate_forces<T, A>(
-    sim: &Simulation<T, A>,
-    ids: &Vec<usize>,
-    forces: &Vec<[f64; 3]>,
-    cur_forces: &mut Vec<[f64; 3]>,
-) where
+fn accumulate_forces<T, A>(sim: &mut Simulation<T, A>, ids: &Vec<usize>, forces: &Vec<[f64; 3]>)
+where
     T: AtomType,
     A: AtomicPotentialTrait<T>,
 {
     for i in 0..sim.atoms.num_atoms() {
         let opt = ids.iter().position(|id| *id == sim.atoms.ids[i]);
+        let mut force = sim.mut_forces()[i];
         if let Some(j) = opt {
-            cur_forces[i][0] += forces[j][0];
-            cur_forces[i][1] += forces[j][1];
-            cur_forces[i][2] += forces[j][2];
+            force[0] += forces[j][0];
+            force[1] += forces[j][1];
+            force[2] += forces[j][2];
         }
     }
 }
 
-fn send_reverse_comm<T, A>(
-    sim: &Simulation<T, A>,
-    forces: &Vec<[f64; 3]>,
-    direction: Direction,
-) -> Vec<usize>
+fn send_reverse_comm<T, A>(sim: &Simulation<T, A>, direction: Direction) -> Vec<usize>
 where
     T: AtomType,
     A: AtomicPotentialTrait<T>,
@@ -256,7 +249,7 @@ where
             .position(|i| *i == *id)
             .expect("Should exist");
 
-        send_forces.push(forces[j]);
+        send_forces.push(sim.forces()[j].clone());
     }
 
     sim.domain()

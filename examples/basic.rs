@@ -11,7 +11,7 @@ fn run(worker: &Worker<Basic>) {
     let rect = Rect::from_lattice(&lattice, [10, 10, 10]);
     let container = Container::from_rect(rect.clone());
 
-    let mut simulation: Simulation<Basic, LJCut> = Simulation::new(atoms, lj, container);
+    let mut simulation: Simulation<Basic, LJCut> = Simulation::new(0.005, atoms, lj, container);
     simulation.connect(Box::new(worker));
 
     simulation.set_atom_types(vec![Basic::new(1.0)]);
@@ -45,11 +45,9 @@ fn run(worker: &Worker<Basic>) {
         ],
     );
 
-    let mut verlet = Verlet::new();
-    verlet.timestep = 0.005;
     println!("Start");
 
-    verlet.run(&mut simulation, 250);
+    simulation.run(250);
 }
 
 fn main() {

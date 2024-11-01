@@ -25,4 +25,6 @@ pub trait AtomicPotentialTrait<T: AtomType> {
     fn type_idx(&self, typei: usize, typej: usize) -> usize {
         self.num_types() * typei + typej
     }
+
+    fn all_set(&self) -> bool;
 }
