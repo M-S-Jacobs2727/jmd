@@ -41,10 +41,6 @@ where
     pub fn len(&self) -> usize {
         self.keys.len()
     }
-
-    pub(crate) fn contains(&self, key: &K) -> bool {
-        self.keys.contains(key)
-    }
 }
 
 impl<K, V> IntoIterator for KeyedVec<K, V>
