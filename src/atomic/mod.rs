@@ -1,13 +1,15 @@
 mod ljcut;
 mod none;
 
-pub use ljcut::LJCut;
+pub use ljcut::{LJCut, LJCutCoeff};
 pub use none::None_;
 
 use crate::{atom_type::AtomType, Atoms, NeighborList};
 
 /// Trait for pairwise atomic potentials
 pub trait AtomicPotentialTrait<T: AtomType> {
+    type CoeffType;
+
     /// Get the maximum distance for effective interaction
     fn cutoff_distance(&self) -> f64;
 

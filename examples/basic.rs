@@ -1,10 +1,11 @@
 use jmd::atom_type::Basic;
-use jmd::atomic::LJCut;
+use jmd::atomic::{LJCut, LJCutCoeff};
 use jmd::*;
 
 fn run(worker: &Worker<Basic>) {
     let atoms: Atoms<Basic> = Atoms::new();
     let lj = LJCut::new(2.5);
+    let coeff = LJCutCoeff::new(1.0, 1.0, 2.5);
 
     let lattice = Cubic::from_density(0.8);
     let rect = Rect::from_lattice(&lattice, [10, 10, 10]);
@@ -14,15 +15,14 @@ fn run(worker: &Worker<Basic>) {
     simulation.connect(Box::new(worker));
 
     simulation.set_atom_types(vec![Basic::new(1.0)]);
+    simulation
+        .mut_atomic_potential()
+        .set_coeff::<Basic>(0, 0, &coeff);
 
     let coords = lattice.coords_within_region(&rect, &[0.0, 0.0, 0.0]);
     simulation.atoms.add_atoms(0, coords);
 
     simulation.atoms.set_temperature(3.0);
-
-    simulation
-        .mut_atomic_potential()
-        .set_coeff::<Basic>(0, 0, 1.0, 1.0, 2.5);
 
     simulation.neighbor_list.set_skin_distance(0.3);
     simulation.neighbor_list.set_update(10, 0, true);

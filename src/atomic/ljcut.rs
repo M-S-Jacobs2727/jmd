@@ -2,7 +2,7 @@ use super::AtomicPotentialTrait;
 use crate::atom_type::AtomType;
 
 #[derive(Clone, Copy, Debug)]
-struct LJCutCoeff {
+pub struct LJCutCoeff {
     sigma: f64,
     epsilon: f64,
     rcut: f64,
@@ -59,14 +59,7 @@ impl LJCut {
             coeff_set: Vec::new(),
         }
     }
-    pub fn set_coeff<T: AtomType>(
-        &mut self,
-        typei: usize,
-        typej: usize,
-        sigma: f64,
-        epsilon: f64,
-        rcut: f64,
-    ) {
+    pub fn set_coeff<T: AtomType>(&mut self, typei: usize, typej: usize, coeff: &LJCutCoeff) {
         assert!(
             typei < self.num_types && typej < self.num_types,
             "Type indices should be less than the number of types (0-indexed)"
@@ -74,9 +67,9 @@ impl LJCut {
 
         let index = <Self as AtomicPotentialTrait<T>>::type_idx(self, typei, typej);
         self.coeff_set[index] = true;
-        self.coeffs[index] = LJCutCoeff::new(sigma, epsilon, rcut);
+        self.coeffs[index] = coeff.clone();
     }
-    pub fn all_set(&self) -> bool {
+    fn all_set(&self) -> bool {
         self.coeff_set.iter().all(|&x| x)
     }
     fn default_coeff() -> LJCutCoeff {
@@ -85,6 +78,7 @@ impl LJCut {
 }
 
 impl<T: AtomType> AtomicPotentialTrait<T> for LJCut {
+    type CoeffType = LJCutCoeff;
     fn cutoff_distance(&self) -> f64 {
         self.force_cutoff
     }
