@@ -109,6 +109,11 @@ where
     pub fn set_container(&mut self, container: Container) {
         self.container = Rc::new(container);
         self.domain.reset_subdomain(&self.container.rect());
+        self.neighbor_list = NeighborList::new(
+            self.container.clone(),
+            self.atomic_potential.cutoff_distance(),
+            self.neighbor_list.skin_distance(),
+        );
     }
     pub fn set_output(&mut self, every: usize, output_keys: Vec<&str>) {
         let output_specs: Vec<OutputSpec> = output_keys
@@ -186,15 +191,9 @@ where
         }
     }
 
-    // Communication functions
-    fn forward_comm(&mut self) {
-        comm::forward_comm(self);
-    }
-    fn reverse_comm(&mut self) {
-        comm::reverse_comm(self);
-    }
-
     // Run methods
+    /// Check that all settings are appropriate and agreeable between all parts
+    /// of the simulation
     fn pre_check(&self) {
         assert!(
             self.atomic_potential.all_set(),
@@ -204,26 +203,49 @@ where
     fn pre_forward_comm(&mut self) {
         Verlet::pre_forward_comm(self);
     }
+    /// Forward communication: communicating the details of owned atoms to neighboring
+    /// processes to use as ghost atoms.
+    fn forward_comm(&mut self) {
+        comm::forward_comm(self);
+    }
     fn post_forward_comm(&mut self) {}
     fn pre_force(&mut self) {}
-    fn pre_reverse_comm(&mut self) {}
-    fn post_reverse_comm(&mut self) {}
+    /// Compute the atomic potential, etc. forces acting on the atoms
     fn compute_forces(&self) -> Vec<[f64; 3]> {
         self.atomic_potential
             .compute_forces(&self.atoms, &self.neighbor_list)
     }
+    fn pre_reverse_comm(&mut self) {}
+    /// Reverse communication: communicating the forces of ghost atoms back to the owning
+    /// processes
+    fn reverse_comm(&mut self) {
+        comm::reverse_comm(self);
+    }
+    fn post_reverse_comm(&mut self) {}
 
+    // Neighbor list methods
+    /// Whether the neighbor list should update on a given step.
+    ///
+    /// If number of steps since last update is not a multiple of nevery, then false.
+    /// Else if number of steps since last update < delay, then false.
+    /// Else if check is false, then true.
+    /// Else if atoms have moved too far, then true.
+    /// Else, false.
     fn nl_should_update(&self, step: usize) -> bool {
-        (step % self.nl_update_settings.every == 0)  // Step is a multiple of every
-            && (step - self.nl_update_settings.last_update_step >= self.nl_update_settings.delay)  // It has been longer than delay since last update
+        let steps_since_last = step - self.nl_update_settings.last_update_step;
+        (steps_since_last % self.nl_update_settings.every == 0)  // Step is a multiple of every
+            && (steps_since_last >= self.nl_update_settings.delay)  // It has been longer than delay since last update
             && (!self.nl_update_settings.check || self.atoms_moved_too_far()) // if check and atoms moved too far, or if check is false
     }
+    /// If the neighbor list has not been built or should be rebuilt, then build it
     fn check_build_neighbor_list(&mut self, step: usize) {
         if !self.neighbor_list.is_built() || self.nl_should_update(step) {
             self.build_neighbor_list();
         }
     }
-
+    /// If this is the first build, then build first.
+    /// Wrap the atoms across periodic boundaries, communicate the new atom ownerships,
+    /// update the neighbor list, and save the positions to compare against in the future.
     fn build_neighbor_list(&mut self) {
         if !self.neighbor_list.is_built() {
             self.neighbor_list.update(self.atoms.positions());
@@ -233,24 +255,7 @@ where
         self.neighbor_list.update(self.atoms.positions());
         self.pos_at_prev_nl_build = self.atoms.positions.clone();
     }
-
-    // TODO: Move to output
-    fn check_do_output(&self, step: usize) {
-        if step % self.output.every != 0 {
-            return;
-        }
-
-        for v in &self.output.values {
-            let value = match v {
-                output::OutputSpec::Step => Value::Usize(step),
-                output::OutputSpec::Compute(c) => c.compute(&self),
-            };
-            self.domain
-                .send_to_main(msg::W2M::Output(thread::current().id(), value));
-        }
-    }
-
-    // Private functions
+    /// Whether any atom has moved further than half the skin distance
     fn atoms_moved_too_far(&self) -> bool {
         let half_skin_dist = self.neighbor_list.skin_distance() * 0.5;
         let opt = self
@@ -268,7 +273,8 @@ where
             None => false,
         }
     }
-
+    /// Wrap atoms across periodic boundary conditions
+    /// TODO: increment periodic image flags
     fn wrap_pbs(&mut self) {
         let rect = self.container().rect().clone();
 
@@ -289,6 +295,22 @@ where
             });
     }
 
+    // Output methods
+    // TODO: Move to output
+    fn check_do_output(&self, step: usize) {
+        if step % self.output.every != 0 {
+            return;
+        }
+
+        for v in &self.output.values {
+            let value = match v {
+                output::OutputSpec::Step => Value::Usize(step),
+                output::OutputSpec::Compute(c) => c.compute(&self),
+            };
+            self.domain
+                .send_to_main(msg::W2M::Output(thread::current().id(), value));
+        }
+    }
     fn initial_output(&self) {
         self.domain().send_to_main_once(msg::W2M::InitialOutput);
     }
