@@ -25,7 +25,6 @@ fn run(worker: &Worker<Basic>) {
     simulation.atoms.set_temperature(3.0);
 
     simulation.neighbor_list.set_skin_distance(0.3);
-    simulation.neighbor_list.set_update(10, 0, true);
 
     simulation.add_compute("AvgVsq", Compute::AvgVsq);
     simulation.add_compute("Temperature", Compute::Temperature);

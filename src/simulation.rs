@@ -161,6 +161,14 @@ where
         );
         self.timestep = timestep;
     }
+    pub fn set_nl_update(&mut self, every: usize, delay: usize, check: bool) {
+        self.nl_update_settings = NLUpdateSettings {
+            every,
+            delay,
+            check,
+            last_update_step: 0,
+        };
+    }
 
     // Other public functions
     pub fn run(&mut self, num_steps: usize) {
