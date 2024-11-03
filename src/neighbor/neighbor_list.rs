@@ -47,20 +47,9 @@ pub struct NeighborList {
     force_distance: f64,
     skin_distance: f64,
     is_built: bool,
-    every: usize,
-    delay: usize,
-    check: bool,
-    last_update_step: usize,
 }
 impl NeighborList {
-    pub fn new(
-        container: Rc<Container>,
-        force_distance: f64,
-        skin_distance: f64,
-        every: usize,
-        delay: usize,
-        check: bool,
-    ) -> Self {
+    pub fn new(container: Rc<Container>, force_distance: f64, skin_distance: f64) -> Self {
         assert!(
             force_distance > 0.0,
             "Force cutoff distance ({}) must be positive",
@@ -83,10 +72,6 @@ impl NeighborList {
             force_distance,
             skin_distance,
             is_built: false,
-            every,
-            delay,
-            check,
-            last_update_step: 0,
         }
     }
 
@@ -106,15 +91,6 @@ impl NeighborList {
     pub fn is_built(&self) -> bool {
         self.is_built
     }
-    pub fn every(&self) -> usize {
-        self.every
-    }
-    pub fn delay(&self) -> usize {
-        self.delay
-    }
-    pub fn check(&self) -> bool {
-        self.check
-    }
 
     // Setters
     pub fn set_bin_size(&mut self, bin_size: f64) {
@@ -132,20 +108,6 @@ impl NeighborList {
             .set_neighbor_distance(self.max_neighbor_distance());
         self.stencil = compute_stencil(bin_size, self.max_neighbor_distance());
     }
-    pub fn set_every(&mut self, every: usize) {
-        self.every = every;
-    }
-    pub fn set_delay(&mut self, delay: usize) {
-        self.delay = delay;
-    }
-    pub fn set_check(&mut self, check: bool) {
-        self.check = check;
-    }
-    pub fn set_update(&mut self, every: usize, delay: usize, check: bool) {
-        self.every = every;
-        self.delay = delay;
-        self.check = check;
-    }
     pub(crate) fn set_force_distance(&mut self, force_distance: f64) {
         self.force_distance = force_distance;
         self.is_built = false;
@@ -155,9 +117,6 @@ impl NeighborList {
         self.stencil = compute_stencil(bin_size, self.max_neighbor_distance());
     }
 
-    pub fn should_update(&self, step: usize) -> bool {
-        (step % self.every == 0) && (step - self.last_update_step >= self.delay)
-    }
     pub fn coord_to_index(&self, coord: &[f64; 3]) -> Index {
         self.grid.coord_to_index(coord)
     }
@@ -220,7 +179,7 @@ mod tests {
 
     fn setup_nl() -> NeighborList {
         let container = Container::new(0.0, 10.0, 0.0, 10.0, 0.0, 10.0, BC::PP, BC::PP, BC::PP);
-        NeighborList::new(Rc::new(container), 2.0, 1.0, 1, 0, true)
+        NeighborList::new(Rc::new(container), 2.0, 1.0)
     }
 
     #[test]

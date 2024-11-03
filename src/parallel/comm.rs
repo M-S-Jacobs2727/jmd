@@ -106,12 +106,17 @@ where
     let msg = sim.domain().receive();
     match msg {
         AtomMessage::Idxs(new_ids) => {
-            let opt = sim.atoms.ids.iter().position(|id| new_ids.contains(id));
-            if let Some(idx) = opt {
-                if sim.container().rect().contains(&sim.atoms.positions[idx]) {
-                    sim.increment_nlocal();
-                }
-            }
+            let num_new_owned_atoms = sim
+                .atoms
+                .ids
+                .iter()
+                .enumerate()
+                .filter(|(i, curr_id)| {
+                    new_ids.contains(curr_id)
+                        && sim.domain().subdomain().contains(&sim.atoms.positions[*i])
+                })
+                .count();
+            sim.atoms.nlocal += num_new_owned_atoms;
         }
         _ => panic!("Invalid message"),
     };

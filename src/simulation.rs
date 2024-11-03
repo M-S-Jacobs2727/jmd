@@ -6,11 +6,19 @@ use crate::{
     compute::{self, ComputeTrait},
     output::{self, Value},
     parallel::{comm, message as msg, Domain, Worker},
-    utils::{KeyError, KeyedVec},
+    utils::KeyedVec,
     Atoms, Axis, Container, Integrator, NeighborList, Output, OutputSpec, Verlet,
 };
 type ComputeVec = KeyedVec<String, compute::Compute>;
 
+struct NLUpdateSettings {
+    pub last_update_step: usize,
+    pub every: usize,
+    pub delay: usize,
+    pub check: bool,
+}
+
+/// The main simulation class in JMD, with one copy held by each process.
 pub struct Simulation<'a, T, A>
 where
     T: AtomType,
@@ -22,16 +30,18 @@ where
     pub neighbor_list: NeighborList,
     domain: Domain<'a, T>,
     output: output::Output,
-    pos_at_prev_neigh_build: Vec<[f64; 3]>,
+    pos_at_prev_nl_build: Vec<[f64; 3]>,
     computes: ComputeVec,
     timestep: f64,
     forces: Vec<[f64; 3]>,
+    nl_update_settings: NLUpdateSettings,
 }
 impl<'a, T, A> Simulation<'a, T, A>
 where
     T: AtomType,
     A: atomic::AtomicPotentialTrait<T>,
 {
+    /// Create a new simulation
     pub fn new(timestep: f64, atoms: Atoms<T>, atomic_potential: A, container: Container) -> Self {
         assert!(
             timestep > 0.0,
@@ -39,14 +49,8 @@ where
             timestep,
         );
         let container = Rc::new(container);
-        let neighbor_list = NeighborList::new(
-            container.clone(),
-            atomic_potential.cutoff_distance(),
-            1.0,
-            1,
-            0,
-            true,
-        );
+        let neighbor_list =
+            NeighborList::new(container.clone(), atomic_potential.cutoff_distance(), 1.0);
         Self {
             atoms,
             container,
@@ -54,10 +58,16 @@ where
             neighbor_list,
             domain: Domain::new(),
             output: output::Output::new(),
-            pos_at_prev_neigh_build: Vec::new(),
+            pos_at_prev_nl_build: Vec::new(),
             computes: KeyedVec::new(),
             timestep,
             forces: Vec::new(),
+            nl_update_settings: NLUpdateSettings {
+                last_update_step: 0,
+                every: 1,
+                delay: 0,
+                check: true,
+            },
         }
     }
 
@@ -85,9 +95,6 @@ where
     pub fn computes(&self) -> &ComputeVec {
         &self.computes
     }
-    pub fn get_compute(&self, id: &str) -> Result<&compute::Compute, KeyError> {
-        self.computes.get(&String::from(id))
-    }
     pub fn timestep(&self) -> f64 {
         self.timestep
     }
@@ -103,9 +110,6 @@ where
         self.container = Rc::new(container);
         self.domain.reset_subdomain(&self.container.rect());
     }
-    pub fn set_domain(&mut self, domain: Domain<'a, T>) {
-        self.domain = domain;
-    }
     pub fn set_output(&mut self, every: usize, output_keys: Vec<&str>) {
         let output_specs: Vec<OutputSpec> = output_keys
             .iter()
@@ -113,7 +117,10 @@ where
                 if key == "step" {
                     OutputSpec::Step
                 } else {
-                    let c = self.get_compute(key).expect("Invalid compute id");
+                    let c = self
+                        .computes
+                        .get(&String::from(key))
+                        .expect("Invalid compute id");
                     OutputSpec::Compute(c.clone())
                 }
             })
@@ -125,9 +132,6 @@ where
             every,
             values: output_specs,
         };
-    }
-    pub(crate) fn increment_nlocal(&mut self) {
-        self.atoms.nlocal += 1;
     }
     pub fn add_compute(&mut self, id: &str, compute: compute::Compute) {
         self.computes.add(String::from(id), compute)
@@ -159,32 +163,26 @@ where
 
         self.initial_output();
 
-        self.pre_forward_comm();
-        self.forward_comm();
-        self.post_forward_comm();
-        self.build_neighbor_list();
-        dbg!(self.atoms.positions.len());
-        dbg!(self.neighbor_list.neighbors().len());
-        self.forces = self.compute_forces();
-        self.reverse_comm();
-        self.check_do_output(&0);
-
-        for step in 1..=num_steps {
+        for step in 0..=num_steps {
+            // Forward communication
             self.pre_forward_comm();
             self.forward_comm();
             self.post_forward_comm();
 
+            // Build neighbor list if applicable
             self.check_build_neighbor_list(step);
-            dbg!(self.atoms.positions.len());
-            dbg!(self.neighbor_list.neighbors().len());
 
+            // Compute forces
             self.pre_force();
             self.forces = self.compute_forces();
+
+            // Reverse communication
             self.pre_reverse_comm();
             self.reverse_comm();
             self.post_reverse_comm();
 
-            self.check_do_output(&step);
+            // Output
+            self.check_do_output(step);
         }
     }
 
@@ -215,14 +213,15 @@ where
             .compute_forces(&self.atoms, &self.neighbor_list)
     }
 
+    fn nl_should_update(&self, step: usize) -> bool {
+        (step % self.nl_update_settings.every == 0)  // Step is a multiple of every
+            && (step - self.nl_update_settings.last_update_step >= self.nl_update_settings.delay)  // It has been longer than delay since last update
+            && (!self.nl_update_settings.check || self.atoms_moved_too_far()) // if check and atoms moved too far, or if check is false
+    }
     fn check_build_neighbor_list(&mut self, step: usize) {
-        if !self.neighbor_list.should_update(step) {
-            return;
+        if !self.neighbor_list.is_built() || self.nl_should_update(step) {
+            self.build_neighbor_list();
         }
-        if self.neighbor_list.check() && !self.atoms_moved_too_far() {
-            return;
-        }
-        self.build_neighbor_list();
     }
 
     fn build_neighbor_list(&mut self) {
@@ -232,18 +231,18 @@ where
         self.wrap_pbs();
         comm::comm_atom_ownership(self);
         self.neighbor_list.update(self.atoms.positions());
-        self.pos_at_prev_neigh_build = self.atoms.positions.clone();
+        self.pos_at_prev_nl_build = self.atoms.positions.clone();
     }
 
     // TODO: Move to output
-    fn check_do_output(&self, step: &usize) {
+    fn check_do_output(&self, step: usize) {
         if step % self.output.every != 0 {
             return;
         }
 
         for v in &self.output.values {
             let value = match v {
-                output::OutputSpec::Step => Value::Usize(*step),
+                output::OutputSpec::Step => Value::Usize(step),
                 output::OutputSpec::Compute(c) => c.compute(&self),
             };
             self.domain
@@ -255,7 +254,7 @@ where
     fn atoms_moved_too_far(&self) -> bool {
         let half_skin_dist = self.neighbor_list.skin_distance() * 0.5;
         let opt = self
-            .pos_at_prev_neigh_build
+            .pos_at_prev_nl_build
             .iter()
             .zip(self.atoms.positions().iter())
             .map(|(old, new)| {
