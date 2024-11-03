@@ -1,5 +1,5 @@
 use super::Region;
-use crate::{Container, Lattice};
+use crate::{Axis, Direction, Lattice};
 
 use rand;
 #[derive(Clone, Copy, Debug)]
@@ -31,16 +31,6 @@ impl Rect {
             yhi,
             zlo,
             zhi,
-        }
-    }
-    pub fn from_box(container: &Container) -> Self {
-        Self {
-            xlo: container.xlo(),
-            xhi: container.xhi(),
-            ylo: container.ylo(),
-            yhi: container.yhi(),
-            zlo: container.zlo(),
-            zhi: container.zhi(),
         }
     }
     pub fn from_lattice(lattice: &impl Lattice, num_cells: [usize; 3]) -> Self {
@@ -86,6 +76,42 @@ impl Rect {
     }
     pub fn hi(&self) -> [f64; 3] {
         [self.xhi, self.yhi, self.zhi]
+    }
+    pub fn lengths(&self) -> [f64; 3] {
+        [self.lx(), self.ly(), self.lz()]
+    }
+
+    // Generic getters
+    pub fn get_length(&self, axis: Axis) -> f64 {
+        self.lengths()[axis.index()]
+    }
+    pub fn get_bound(&self, direction: Direction) -> f64 {
+        match direction {
+            Direction::Xlo => self.xlo,
+            Direction::Xhi => self.xhi,
+            Direction::Ylo => self.ylo,
+            Direction::Yhi => self.yhi,
+            Direction::Zlo => self.zlo,
+            Direction::Zhi => self.zhi,
+        }
+    }
+    pub fn get_bounds(&self, axis: Axis) -> [f64; 2] {
+        match axis {
+            Axis::X => [self.xlo, self.xhi],
+            Axis::Y => [self.ylo, self.yhi],
+            Axis::Z => [self.zlo, self.zhi],
+        }
+    }
+
+    pub(crate) fn set_bound(&mut self, direction: Direction, bound: f64) {
+        match direction {
+            Direction::Xlo => self.xlo = bound,
+            Direction::Xhi => self.xhi = bound,
+            Direction::Ylo => self.ylo = bound,
+            Direction::Yhi => self.yhi = bound,
+            Direction::Zlo => self.zlo = bound,
+            Direction::Zhi => self.zhi = bound,
+        };
     }
 }
 impl Region for Rect {

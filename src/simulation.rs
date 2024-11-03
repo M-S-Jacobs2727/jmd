@@ -101,7 +101,7 @@ where
     // Setters
     pub fn set_container(&mut self, container: Container) {
         self.container = Rc::new(container);
-        self.domain.reset_subdomain(&self.container);
+        self.domain.reset_subdomain(&self.container.rect());
     }
     pub fn set_domain(&mut self, domain: Domain<'a, T>) {
         self.domain = domain;
@@ -271,36 +271,23 @@ where
     }
 
     fn wrap_pbs(&mut self) {
-        if self.container().is_periodic(Axis::X) {
-            let [lo, hi] = [self.container().xlo(), self.container().xhi()];
-            self.atoms.positions.iter_mut().for_each(|p| {
-                if p[0] < lo {
-                    p[0] += hi - lo;
-                } else if p[0] > hi {
-                    p[0] -= hi - lo;
+        let rect = self.container().rect().clone();
+
+        vec![Axis::X, Axis::Y, Axis::Z]
+            .iter()
+            .enumerate()
+            .for_each(|(i, &axis)| {
+                if self.container().is_periodic(axis) {
+                    let [lo, hi] = rect.get_bounds(axis);
+                    self.atoms.positions.iter_mut().for_each(|p| {
+                        if p[i] < lo {
+                            p[i] += hi - lo;
+                        } else if p[i] > hi {
+                            p[i] -= hi - lo;
+                        }
+                    });
                 }
             });
-        }
-        if self.container().is_periodic(Axis::Y) {
-            let [lo, hi] = [self.container().ylo(), self.container().yhi()];
-            self.atoms.positions.iter_mut().for_each(|p| {
-                if p[1] < lo {
-                    p[1] += hi - lo;
-                } else if p[1] > hi {
-                    p[1] -= hi - lo;
-                }
-            });
-        }
-        if self.container().is_periodic(Axis::Z) {
-            let [lo, hi] = [self.container().zlo(), self.container().zhi()];
-            self.atoms.positions.iter_mut().for_each(|p| {
-                if p[2] < lo {
-                    p[2] += hi - lo;
-                } else if p[2] > hi {
-                    p[2] -= hi - lo;
-                }
-            });
-        }
     }
 
     fn initial_output(&self) {

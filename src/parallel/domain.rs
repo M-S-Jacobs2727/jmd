@@ -71,8 +71,12 @@ impl<'a, T: AtomType> Domain<'a, T> {
 
         let num_threads = self.thread_ids().len();
 
-        let proc_dimensions =
-            procs_in_box(num_threads, container.lx(), container.ly(), container.lz());
+        let proc_dimensions = procs_in_box(
+            num_threads,
+            container.rect().lx(),
+            container.rect().ly(),
+            container.rect().lz(),
+        );
         let idx = self
             .thread_ids()
             .iter()
@@ -80,14 +84,18 @@ impl<'a, T: AtomType> Domain<'a, T> {
             .unwrap();
         self.proc_location = Index::from_1d(idx, proc_dimensions);
 
-        self.reset_subdomain(container);
+        self.reset_subdomain(container.rect());
 
-        self.setup_neighbor(Direction::Xlo, container);
-        self.setup_neighbor(Direction::Xhi, container);
-        self.setup_neighbor(Direction::Ylo, container);
-        self.setup_neighbor(Direction::Yhi, container);
-        self.setup_neighbor(Direction::Zlo, container);
-        self.setup_neighbor(Direction::Zhi, container);
+        vec![
+            Direction::Xlo,
+            Direction::Xhi,
+            Direction::Ylo,
+            Direction::Yhi,
+            Direction::Zlo,
+            Direction::Zhi,
+        ]
+        .iter()
+        .for_each(|direction| self.setup_neighbor(*direction, container));
     }
     pub(crate) fn subdomain(&self) -> &Rect {
         &self.subdomain
@@ -117,14 +125,14 @@ impl<'a, T: AtomType> Domain<'a, T> {
     pub fn initialized(&self) -> bool {
         self.worker.is_some()
     }
-    pub fn reset_subdomain(&mut self, container: &Container) {
+    pub fn reset_subdomain(&mut self, rect: &Rect) {
         let bounds = self.proc_location.bounds();
         let l = [
-            container.lx() / (bounds[0] as f64),
-            container.ly() / (bounds[1] as f64),
-            container.lz() / (bounds[2] as f64),
+            rect.lx() / (bounds[0] as f64),
+            rect.ly() / (bounds[1] as f64),
+            rect.lz() / (bounds[2] as f64),
         ];
-        let lo = container.lo();
+        let lo = rect.lo();
         let idx3d = self.proc_location.to_3d();
         let sdlo = [
             lo[0] + l[0] * idx3d[0] as f64,

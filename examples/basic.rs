@@ -9,7 +9,7 @@ fn run(worker: &Worker<Basic>) {
 
     let lattice = Cubic::from_density(0.8);
     let rect = Rect::from_lattice(&lattice, [10, 10, 10]);
-    let container = Container::from_rect(rect.clone());
+    let container = Container::from_rect_periodic(rect.clone());
 
     let mut simulation: Simulation<Basic, LJCut> = Simulation::new(0.005, atoms, lj, container);
     simulation.connect(Box::new(worker));

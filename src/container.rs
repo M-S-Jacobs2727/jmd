@@ -1,4 +1,4 @@
-use crate::{region::Rect, Axis};
+use crate::{region::Rect, Axis, Direction};
 
 /// Boundary conditions for simulation box.
 ///
@@ -20,6 +20,7 @@ pub enum BC {
     SS,
 }
 impl BC {
+    /// Check whether the boundary condition is periodic
     pub fn is_periodic(&self) -> bool {
         match self {
             BC::PP => true,
@@ -28,14 +29,16 @@ impl BC {
     }
 }
 
-/// Simulation box, represented by x, y, and z Bounds
+/// Simulation box, represented by a rectangular box and boundary conditions
 #[derive(Debug)]
 pub struct Container {
     rect: Rect,
     bc: [BC; 3],
 }
-
 impl Container {
+    // Creation
+
+    /// Create a new container from boundary values and conditions
     pub fn new(
         xlo: f64,
         xhi: f64,
@@ -53,52 +56,50 @@ impl Container {
             bc: [xbc, ybc, zbc],
         }
     }
-    pub fn from_rect(rect: Rect) -> Self {
+    /// Create a fully periodic container from a given rectangular box
+    pub fn from_rect_periodic(rect: Rect) -> Self {
         Self {
             rect,
             bc: [BC::PP, BC::PP, BC::PP],
         }
     }
+
+    // Getters
+    /// Check whether the boundary condition along a given axis (X, Y, Z) is periodic
     pub fn is_periodic(&self, axis: Axis) -> bool {
         self.bc[axis.index()].is_periodic()
     }
+    /// A reference to the rectangular box
     pub fn rect(&self) -> &Rect {
         &self.rect
     }
-    pub fn lx(&self) -> f64 {
-        self.rect.lx()
+
+    // Setters
+
+    pub fn set_bound(&mut self, direction: Direction, bound: f64) {
+        let opposite_bound = self.rect.get_bound(direction.opposite());
+        if direction.is_lo() {
+            assert!(
+                bound < opposite_bound,
+                "Given lower bound {:?} = {} should be less than the current upper bound {:?} = {}",
+                direction,
+                bound,
+                direction.opposite(),
+                opposite_bound,
+            );
+        } else {
+            assert!(
+                bound > opposite_bound,
+                "Given upper bound {:?} = {} should be less than the current lower bound {:?} = {}",
+                direction,
+                bound,
+                direction.opposite(),
+                opposite_bound,
+            );
+        }
+        self.rect.set_bound(direction, bound);
     }
-    pub fn ly(&self) -> f64 {
-        self.rect.ly()
-    }
-    pub fn lz(&self) -> f64 {
-        self.rect.lz()
-    }
-    pub fn lengths(&self) -> [f64; 3] {
-        [self.lx(), self.ly(), self.lz()]
-    }
-    pub fn lo(&self) -> [f64; 3] {
-        [self.xlo(), self.ylo(), self.zlo()]
-    }
-    pub fn hi(&self) -> [f64; 3] {
-        [self.xhi(), self.yhi(), self.zhi()]
-    }
-    pub fn xlo(&self) -> f64 {
-        self.rect.xlo()
-    }
-    pub fn xhi(&self) -> f64 {
-        self.rect.xhi()
-    }
-    pub fn ylo(&self) -> f64 {
-        self.rect.ylo()
-    }
-    pub fn yhi(&self) -> f64 {
-        self.rect.yhi()
-    }
-    pub fn zlo(&self) -> f64 {
-        self.rect.zlo()
-    }
-    pub fn zhi(&self) -> f64 {
-        self.rect.zhi()
+    pub fn set_boundary_condition(&mut self, axis: Axis, bc: BC) {
+        self.bc[axis.index()] = bc;
     }
 }

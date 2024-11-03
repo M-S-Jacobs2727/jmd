@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use crate::{utils::indices::Index, Container};
+use crate::{utils::indices::Index, Container, Rect};
 
 /// Neighbor list grid of bins
 #[derive(Debug)]
@@ -23,7 +23,8 @@ impl Grid {
             "Neighbor distance should be positive, found {}",
             neighbor_distance
         );
-        let min_box_length = container.lx().min(container.ly()).min(container.lz());
+        let rect = container.rect();
+        let min_box_length = rect.lx().min(rect.ly()).min(rect.lz());
         assert!(
             bin_size < 0.5 * min_box_length,
             "Bin size must be less than half the smallest box length, \
@@ -33,14 +34,14 @@ impl Grid {
         );
         let buffer = 2.0 * neighbor_distance;
         let lo_corner = [
-            container.xlo() - buffer,
-            container.ylo() - buffer,
-            container.zlo() - buffer,
+            rect.xlo() - buffer,
+            rect.ylo() - buffer,
+            rect.zlo() - buffer,
         ];
         let num_bins: [usize; 3] = [
-            ((container.lx() + 2.0 * buffer) / bin_size).ceil() as usize,
-            ((container.ly() + 2.0 * buffer) / bin_size).ceil() as usize,
-            ((container.lz() + 2.0 * buffer) / bin_size).ceil() as usize,
+            ((rect.lx() + 2.0 * buffer) / bin_size).ceil() as usize,
+            ((rect.ly() + 2.0 * buffer) / bin_size).ceil() as usize,
+            ((rect.lz() + 2.0 * buffer) / bin_size).ceil() as usize,
         ];
         Self {
             lo_corner,
@@ -50,17 +51,20 @@ impl Grid {
             container,
         }
     }
+    fn rect(&self) -> &Rect {
+        self.container.rect()
+    }
     fn recompute(&mut self) {
         let buffer = 2.0 * self.neighbor_distance;
         self.lo_corner = [
-            self.container.xlo() - buffer,
-            self.container.ylo() - buffer,
-            self.container.zlo() - buffer,
+            self.rect().xlo() - buffer,
+            self.rect().ylo() - buffer,
+            self.rect().zlo() - buffer,
         ];
         self.num_bins = [
-            ((self.container.lx() + 2.0 * buffer) / self.bin_size).ceil() as usize,
-            ((self.container.ly() + 2.0 * buffer) / self.bin_size).ceil() as usize,
-            ((self.container.lz() + 2.0 * buffer) / self.bin_size).ceil() as usize,
+            ((self.rect().lx() + 2.0 * buffer) / self.bin_size).ceil() as usize,
+            ((self.rect().ly() + 2.0 * buffer) / self.bin_size).ceil() as usize,
+            ((self.rect().lz() + 2.0 * buffer) / self.bin_size).ceil() as usize,
         ];
     }
     pub(super) fn bin_size(&self) -> f64 {
