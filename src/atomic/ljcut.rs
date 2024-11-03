@@ -87,7 +87,7 @@ impl<T: AtomType> AtomicPotentialTrait<T> for LJCut {
         neighbor_list: &crate::NeighborList,
     ) -> Vec<[f64; 3]> {
         let mut forces: Vec<[f64; 3]> = Vec::new();
-        forces.resize(atoms.num_atoms(), [0.0, 0.0, 0.0]);
+        forces.resize(atoms.num_total_atoms(), [0.0, 0.0, 0.0]);
         for i in 0..atoms.nlocal {
             let typei = &atoms.types[i];
             let posi = &atoms.positions[i];

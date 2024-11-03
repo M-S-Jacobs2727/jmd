@@ -13,7 +13,7 @@ impl<T: AtomType> AtomicPotentialTrait<T> for None_ {
         0.0
     }
     fn compute_forces(&self, atoms: &Atoms<T>, _neighbor_list: &NeighborList) -> Vec<[f64; 3]> {
-        let natoms = atoms.num_atoms();
+        let natoms = atoms.num_total_atoms();
         let mut forces = Vec::new();
         forces.resize(natoms, [0.0, 0.0, 0.0]);
         forces

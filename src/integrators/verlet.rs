@@ -12,7 +12,7 @@ impl Verlet {
         A: AtomicPotentialTrait<T>,
     {
         let half_ts = 0.5 * simulation.timestep();
-        for i in 0..simulation.atoms.num_atoms() {
+        for i in 0..simulation.atoms.num_local_atoms() {
             let mass = simulation.atoms.mass(i);
             simulation.atoms.increment_velocity(
                 i,
@@ -31,7 +31,7 @@ impl Verlet {
         A: AtomicPotentialTrait<T>,
     {
         let ts = simulation.timestep();
-        for i in 0..simulation.atoms.num_atoms() {
+        for i in 0..simulation.atoms.num_local_atoms() {
             let vel = simulation.atoms.velocities()[i];
 
             simulation

@@ -213,18 +213,23 @@ where
         .collect()
 }
 
-fn accumulate_forces<T, A>(sim: &mut Simulation<T, A>, ids: &Vec<usize>, forces: &Vec<[f64; 3]>)
-where
+fn accumulate_forces<T, A>(
+    sim: &mut Simulation<T, A>,
+    communicated_ids: &Vec<usize>,
+    communicated_forces: &Vec<[f64; 3]>,
+) where
     T: AtomType,
     A: AtomicPotentialTrait<T>,
 {
-    for i in 0..sim.atoms.num_atoms() {
-        let opt = ids.iter().position(|id| *id == sim.atoms.ids[i]);
-        let mut force = sim.mut_forces()[i];
+    let natoms = sim.atoms.num_total_atoms();
+    for i in 0..natoms {
+        let opt = communicated_ids
+            .iter()
+            .position(|id| *id == sim.atoms.ids[i]);
         if let Some(j) = opt {
-            force[0] += forces[j][0];
-            force[1] += forces[j][1];
-            force[2] += forces[j][2];
+            sim.mut_forces()[i][0] += communicated_forces[j][0];
+            sim.mut_forces()[i][1] += communicated_forces[j][1];
+            sim.mut_forces()[i][2] += communicated_forces[j][2];
         }
     }
 }
