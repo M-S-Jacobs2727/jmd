@@ -6,38 +6,6 @@ use crate::{
     Container,
 };
 
-fn compute_stencil(bin_size: f64, neighbor_distance: f64) -> Vec<[i32; 3]> {
-    let max_number_out = (neighbor_distance / bin_size).ceil() as i32;
-    let mut stencil: Vec<[i32; 3]> = Vec::new();
-    for i in 0..max_number_out + 1 {
-        stencil.push([i, 0, 0]);
-    }
-    for i in -max_number_out..max_number_out + 1 {
-        for j in 1..max_number_out + 1 {
-            let i2 = (i.abs() - 1).max(0);
-            let j2 = (j.abs() - 1).max(0);
-            let min_dist = ((i2 * i2 + j2 * j2) as f64).sqrt();
-            if min_dist < neighbor_distance {
-                stencil.push([i, j, 0]);
-            }
-        }
-    }
-    for i in -max_number_out..max_number_out + 1 {
-        for j in -max_number_out..max_number_out + 1 {
-            for k in 1..max_number_out + 1 {
-                let i2 = (i.abs() - 1).max(0);
-                let j2 = (j.abs() - 1).max(0);
-                let k2 = (k.abs() - 1).max(0);
-                let min_dist = ((i2 * i2 + j2 * j2 + k2 * k2) as f64).sqrt();
-                if min_dist < neighbor_distance {
-                    stencil.push([i, j, k]);
-                }
-            }
-        }
-    }
-    stencil
-}
-
 /// Used for computing a list of neighboring particles
 #[derive(Debug)]
 pub struct NeighborList {
@@ -46,7 +14,6 @@ pub struct NeighborList {
     neighbors: Vec<Vec<usize>>,
     force_distance: f64,
     skin_distance: f64,
-    is_built: bool,
 }
 impl NeighborList {
     pub fn new(container: Rc<Container>, force_distance: f64, skin_distance: f64) -> Self {
@@ -62,17 +29,48 @@ impl NeighborList {
         );
         let neighbor_distance = skin_distance + force_distance;
         let bin_size = neighbor_distance * 0.5;
-        let stencil = compute_stencil(bin_size, neighbor_distance);
+        let stencil = NeighborList::compute_stencil(bin_size, neighbor_distance);
         let grid = Grid::new(container, bin_size, neighbor_distance);
-        // dbg!(&grid);
         Self {
             grid,
             stencil,
             neighbors: Vec::new(),
             force_distance,
             skin_distance,
-            is_built: false,
         }
+    }
+    /// Compute a set of integer offsets to a bin index that corresponds
+    /// to populating a half neighbor list
+    fn compute_stencil(bin_size: f64, neighbor_distance: f64) -> Vec<[i32; 3]> {
+        let max_number_out = (neighbor_distance / bin_size).ceil() as i32;
+        let mut stencil: Vec<[i32; 3]> = Vec::new();
+        for i in 0..max_number_out + 1 {
+            stencil.push([i, 0, 0]);
+        }
+        for i in -max_number_out..max_number_out + 1 {
+            for j in 1..max_number_out + 1 {
+                let i2 = (i.abs() - 1).max(0);
+                let j2 = (j.abs() - 1).max(0);
+                let min_dist = ((i2 * i2 + j2 * j2) as f64).sqrt();
+                if min_dist < neighbor_distance {
+                    stencil.push([i, j, 0]);
+                }
+            }
+        }
+        for i in -max_number_out..max_number_out + 1 {
+            for j in -max_number_out..max_number_out + 1 {
+                for k in 1..max_number_out + 1 {
+                    let i2 = (i.abs() - 1).max(0);
+                    let j2 = (j.abs() - 1).max(0);
+                    let k2 = (k.abs() - 1).max(0);
+                    let min_dist = ((i2 * i2 + j2 * j2 + k2 * k2) as f64).sqrt();
+                    if min_dist < neighbor_distance {
+                        stencil.push([i, j, k]);
+                    }
+                }
+            }
+        }
+        stencil
     }
 
     // Getters
@@ -89,51 +87,45 @@ impl NeighborList {
         self.skin_distance + self.force_distance
     }
     pub fn is_built(&self) -> bool {
-        self.is_built
+        !self.neighbors.is_empty()
     }
 
     // Setters
     pub fn set_bin_size(&mut self, bin_size: f64) {
         self.grid.set_bin_size(bin_size);
-        self.stencil = compute_stencil(bin_size, self.max_neighbor_distance());
+        self.stencil = NeighborList::compute_stencil(bin_size, self.max_neighbor_distance());
     }
     pub fn set_skin_distance(&mut self, skin_distance: f64) {
         if skin_distance <= 0.0 {
             panic!("Skin distance must be positive, found {}", skin_distance);
         }
         self.skin_distance = skin_distance;
-        self.is_built = false;
+        self.neighbors.clear();
         let bin_size = self.grid.bin_size();
         self.grid
             .set_neighbor_distance(self.max_neighbor_distance());
-        self.stencil = compute_stencil(bin_size, self.max_neighbor_distance());
+        self.stencil = NeighborList::compute_stencil(bin_size, self.max_neighbor_distance());
     }
     pub(crate) fn set_force_distance(&mut self, force_distance: f64) {
         self.force_distance = force_distance;
-        self.is_built = false;
+        self.neighbors.clear();
         let bin_size = self.grid.bin_size();
         self.grid
             .set_neighbor_distance(self.max_neighbor_distance());
-        self.stencil = compute_stencil(bin_size, self.max_neighbor_distance());
+        self.stencil = NeighborList::compute_stencil(bin_size, self.max_neighbor_distance());
     }
 
-    pub fn coord_to_index(&self, coord: &[f64; 3]) -> Index {
-        self.grid.coord_to_index(coord)
-    }
+    /// Update the neighbor list based on the positions of the owned and ghost atoms in the current process
     pub fn update(&mut self, positions: &Vec<[f64; 3]>) {
-        self.is_built = true;
         let num_atoms = positions.len();
 
         self.neighbors.clear();
         self.neighbors.resize(num_atoms, Vec::new());
         let neigh_dist_sq = self.max_neighbor_distance() * self.max_neighbor_distance();
 
-        // dbg!(positions);
         let atom_indices_per_bin = self.bin_atoms(&positions);
         positions.iter().enumerate().for_each(|(i, pos)| {
             let bin_idx = self.grid.coord_to_index(pos);
-            // dbg!(pos);
-            // dbg!(&bin_idx);
             let bin_3d = bin_idx.to_3d();
             for offset in &self.stencil {
                 let comp_bin = Index::from_3d(
@@ -154,20 +146,15 @@ impl NeighborList {
             }
         });
     }
+    /// Assign each atom to a bin in the grid based on its position
     fn bin_atoms(&self, positions: &Vec<[f64; 3]>) -> Vec<Vec<usize>> {
         let mut atom_indices_per_bin: Vec<Vec<usize>> = Vec::new();
         atom_indices_per_bin.resize(self.grid.total_num_bins(), Vec::new());
         positions
             .iter()
-            .map(|p| {
-                // dbg!(p);
-                self.grid.coord_to_index(p)
-            })
+            .map(|p| self.grid.coord_to_index(p))
             .enumerate()
-            .for_each(|(atom_idx, bin_idx)| {
-                // dbg!(bin_idx);
-                atom_indices_per_bin[bin_idx.idx()].push(atom_idx)
-            });
+            .for_each(|(atom_idx, bin_idx)| atom_indices_per_bin[bin_idx.idx()].push(atom_idx));
         atom_indices_per_bin
     }
 }

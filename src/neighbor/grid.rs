@@ -3,6 +3,8 @@ use std::rc::Rc;
 use crate::{utils::indices::Index, Container, Rect};
 
 /// Neighbor list grid of bins
+///
+/// Should only be accessed by `super::NeighborList`
 #[derive(Debug)]
 pub(super) struct Grid {
     lo_corner: [f64; 3],
@@ -54,6 +56,7 @@ impl Grid {
     fn rect(&self) -> &Rect {
         self.container.rect()
     }
+    /// Recompute the grid based on the updated container or other new values
     fn recompute(&mut self) {
         let buffer = 2.0 * self.neighbor_distance;
         self.lo_corner = [
@@ -104,6 +107,8 @@ impl Grid {
     pub(super) fn num_bins(&self) -> [usize; 3] {
         self.num_bins
     }
+    /// Given a coordinate within the grid (possibly outside the container),
+    /// return the corresponding bin index
     pub(super) fn coord_to_index(&self, coord: &[f64; 3]) -> Index {
         let inds = [
             ((coord[0] - self.lo_corner[0]) / self.bin_size).floor(),
