@@ -7,6 +7,7 @@ use std::{
 use super::{message as msg, worker::Worker, AdjacentProcs};
 use crate::{
     atom_type::AtomType,
+    atomic,
     region::Rect,
     utils::{indices::Index, Direction},
     Container, NeighborList,
@@ -44,15 +45,15 @@ fn procs_in_box(nprocs: usize, lx: f64, ly: f64, lz: f64) -> [usize; 3] {
 }
 
 /// Represents a process in relation to the other neighboring processes
-pub struct Domain<'a, T: AtomType> {
+pub struct Domain<'a, T: AtomType, A: atomic::AtomicPotentialTrait<T>> {
     receiver: mpsc::Receiver<msg::AtomMessage>,
     my_sender: mpsc::Sender<msg::AtomMessage>,
-    worker: Option<Box<&'a Worker<T>>>,
+    worker: Option<Box<&'a Worker<T, A>>>,
     procs: AdjacentProcs,
     subdomain: Rect,
     proc_location: Index,
 }
-impl<'a, T: AtomType> Domain<'a, T> {
+impl<'a, T: AtomType, A: atomic::AtomicPotentialTrait<T>> Domain<'a, T, A> {
     pub(crate) fn new() -> Self {
         let neighbor_procs: AdjacentProcs = AdjacentProcs::new();
         let (my_sender, receiver) = mpsc::channel();
@@ -66,7 +67,7 @@ impl<'a, T: AtomType> Domain<'a, T> {
             proc_location: Index::new(),
         }
     }
-    pub(crate) fn init(&mut self, container: &Container, worker: Box<&'a Worker<T>>) {
+    pub(crate) fn init(&mut self, container: &Container, worker: Box<&'a Worker<T, A>>) {
         self.worker = Some(worker);
 
         let num_threads = self.thread_ids().len();
@@ -100,7 +101,7 @@ impl<'a, T: AtomType> Domain<'a, T> {
     pub(crate) fn subdomain(&self) -> &Rect {
         &self.subdomain
     }
-    pub(crate) fn worker(&self) -> &Box<&'a Worker<T>> {
+    pub(crate) fn worker(&self) -> &Box<&'a Worker<T, A>> {
         self.worker.as_ref().expect("Must init")
     }
     fn setup_neighbor(&mut self, direction: Direction, container: &Container) {

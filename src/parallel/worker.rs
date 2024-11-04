@@ -3,16 +3,16 @@ use std::{
     thread::{self, ThreadId},
 };
 
-use crate::{atom_type::AtomType, parallel::message as msg};
+use crate::{atom_type::AtomType, parallel::message as msg, AtomicPotentialTrait, Simulation};
 
 /// Channels for communication between each process and the manager
-pub struct Worker<T: AtomType> {
-    rx: mpsc::Receiver<msg::M2W<T>>,
+pub struct Worker<T: AtomType, A: AtomicPotentialTrait<T>> {
+    rx: mpsc::Receiver<msg::M2W<T, A>>,
     tx: mpsc::Sender<msg::W2M<T>>,
     thread_ids: Vec<ThreadId>,
 }
-impl<T: AtomType> Worker<T> {
-    pub fn new(rx: mpsc::Receiver<msg::M2W<T>>, tx: mpsc::Sender<msg::W2M<T>>) -> Self {
+impl<T: AtomType, A: AtomicPotentialTrait<T>> Worker<T, A> {
+    pub fn new(rx: mpsc::Receiver<msg::M2W<T, A>>, tx: mpsc::Sender<msg::W2M<T>>) -> Self {
         Self {
             rx,
             tx,
@@ -39,17 +39,17 @@ impl<T: AtomType> Worker<T> {
     pub fn send(&self, message: msg::W2M<T>) {
         self.tx.send(message).expect("Disconnect error");
     }
-    pub fn recv(&self) -> Result<msg::M2W<T>, mpsc::RecvError> {
+    pub fn recv(&self) -> Result<msg::M2W<T, A>, mpsc::RecvError> {
         self.rx.recv()
     }
-    pub fn try_recv(&self) -> Result<msg::M2W<T>, mpsc::TryRecvError> {
+    pub fn try_recv(&self) -> Result<msg::M2W<T, A>, mpsc::TryRecvError> {
         self.rx.try_recv()
     }
 
     fn run(&self) {
         let msg = self.rx.recv().unwrap();
         match msg {
-            msg::M2W::Run(f) => f(self),
+            msg::M2W::Run(f) => f(Simulation::new()),
             _ => panic!("Invalid communication"),
         };
     }

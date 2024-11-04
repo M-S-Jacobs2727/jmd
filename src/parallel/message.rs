@@ -3,10 +3,8 @@ use std::{sync::mpsc, thread};
 use crate::{
     atom_type::AtomType,
     output::{OutputSpec, Value},
-    Atoms, Container,
+    AtomicPotentialTrait, Atoms, Container, Simulation,
 };
-
-use super::Worker;
 
 /// Message between procs communicating atom info
 pub enum AtomMessage {
@@ -30,9 +28,9 @@ pub enum W2M<T: AtomType> {
 }
 
 /// Manager-to-Worker messages
-pub enum M2W<T: AtomType> {
+pub enum M2W<T: AtomType, A: AtomicPotentialTrait<T>> {
     Setup(Vec<thread::ThreadId>),
-    Run(fn(&Worker<T>) -> ()),
+    Run(fn(Simulation<T, A>) -> ()),
     Sender(Option<mpsc::Sender<AtomMessage>>),
     ProcDims([usize; 3]),
 }

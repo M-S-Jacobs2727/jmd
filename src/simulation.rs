@@ -7,7 +7,7 @@ use crate::{
     output::{self, Value},
     parallel::{comm, message as msg, Domain, Worker},
     utils::KeyedVec,
-    Atoms, Axis, Container, Integrator, NeighborList, Output, OutputSpec, Verlet,
+    Atoms, Axis, Container, Integrator, NeighborList, Output, OutputSpec, Verlet, BC,
 };
 type ComputeVec = KeyedVec<String, compute::Compute>;
 
@@ -28,7 +28,7 @@ where
     container: Rc<Container>,
     atomic_potential: A,
     pub neighbor_list: NeighborList,
-    domain: Domain<'a, T>,
+    domain: Domain<'a, T, A>,
     output: output::Output,
     pos_at_prev_nl_build: Vec<[f64; 3]>,
     computes: ComputeVec,
@@ -42,13 +42,20 @@ where
     A: atomic::AtomicPotentialTrait<T>,
 {
     /// Create a new simulation
-    pub fn new(timestep: f64, atomic_potential: A, container: Container) -> Self {
-        assert!(
-            timestep > 0.0,
-            "Timestep should be positive, found {}",
-            timestep,
-        );
-        let container = Rc::new(container);
+    pub fn new() -> Self {
+        let timestep = 1.0;
+        let container = Rc::new(Container::new(
+            0.0,
+            1.0,
+            0.0,
+            1.0,
+            0.0,
+            1.0,
+            BC::PP,
+            BC::PP,
+            BC::PP,
+        ));
+        let atomic_potential = A::new();
         let neighbor_list =
             NeighborList::new(container.clone(), atomic_potential.cutoff_distance(), 1.0);
         Self {
@@ -72,7 +79,7 @@ where
     }
 
     /// Initializes the simulation from a worker thread
-    pub fn connect(&mut self, worker: Box<&'a Worker<T>>) {
+    pub fn connect(&mut self, worker: Box<&'a Worker<T, A>>) {
         self.domain.init(&self.container, worker)
     }
 
@@ -86,7 +93,7 @@ where
     pub fn mut_atomic_potential(&mut self) -> &mut A {
         &mut self.atomic_potential
     }
-    pub(crate) fn domain(&self) -> &Domain<T> {
+    pub(crate) fn domain(&self) -> &Domain<T, A> {
         &self.domain
     }
     pub(crate) fn nlocal(&self) -> usize {

@@ -59,6 +59,14 @@ impl LJCut {
             coeff_set: Vec::new(),
         }
     }
+    pub fn set_global_cutoff(&mut self, cutoff: f64) {
+        assert!(
+            self.coeffs.iter().zip(self.coeff_set.iter()).all(|(c, set)| !set || c.rcut <= cutoff),
+            "Global cutoff distance {} should be greater than the maximum cutoff distance in the coefficients",
+            cutoff
+        );
+        self.force_cutoff = cutoff;
+    }
     pub fn set_coeff<T: AtomType>(&mut self, typei: usize, typej: usize, coeff: &LJCutCoeff) {
         assert!(
             typei < self.num_types && typej < self.num_types,
@@ -76,6 +84,9 @@ impl LJCut {
 
 impl<T: AtomType> AtomicPotentialTrait<T> for LJCut {
     type Coeff = LJCutCoeff;
+    fn new() -> Self {
+        Self::new(1.0)
+    }
     fn cutoff_distance(&self) -> f64 {
         self.force_cutoff
     }

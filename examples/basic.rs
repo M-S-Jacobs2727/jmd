@@ -2,16 +2,15 @@ use jmd::atom_type::Basic;
 use jmd::atomic::{LJCut, LJCutCoeff};
 use jmd::*;
 
-fn run(worker: &Worker<Basic>) {
+fn run(mut simulation: Simulation<atom_type::Basic, LJCut>) {
     let lj = LJCut::new(2.5);
     let coeff = LJCutCoeff::new(1.0, 1.0, 2.5);
+    simulation.set_atomic_potential(lj);
 
     let lattice = Cubic::from_density(0.8);
     let rect = Rect::from_lattice(&lattice, [10, 10, 10]);
     let container = Container::from_rect_periodic(rect.clone());
-
-    let mut simulation: Simulation<Basic, LJCut> = Simulation::new(0.005, lj, container);
-    simulation.connect(Box::new(worker));
+    simulation.set_container(container);
 
     simulation.set_atom_types(vec![Basic::new(1.0)]);
     simulation
@@ -24,6 +23,7 @@ fn run(worker: &Worker<Basic>) {
     simulation.atoms.set_temperature(3.0);
 
     simulation.neighbor_list.set_skin_distance(0.3);
+    simulation.set_nl_update(10, 0, true);
 
     simulation.add_compute("AvgVsq", Compute::AvgVsq);
     simulation.add_compute("Temperature", Compute::Temperature);
@@ -49,7 +49,7 @@ fn run(worker: &Worker<Basic>) {
 }
 
 fn main() {
-    let mut sim: Jmd<atom_type::Basic> = Jmd::new();
+    let mut sim: Jmd<atom_type::Basic, LJCut> = Jmd::new();
 
     sim.run(1, run);
 }

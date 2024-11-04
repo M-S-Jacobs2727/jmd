@@ -2,13 +2,11 @@ use super::AtomicPotentialTrait;
 use crate::{atom_type::AtomType, Atoms, NeighborList};
 
 pub struct None_ {}
-impl None_ {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
 impl<T: AtomType> AtomicPotentialTrait<T> for None_ {
     type Coeff = ();
+    fn new() -> Self {
+        Self {}
+    }
     fn cutoff_distance(&self) -> f64 {
         0.0
     }

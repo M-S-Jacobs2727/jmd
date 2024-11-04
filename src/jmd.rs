@@ -3,22 +3,24 @@ use std::{sync::mpsc, time::Duration};
 
 use crate::atom_type::AtomType;
 use crate::{output::*, parallel::message as msg, parallel::Worker};
+use crate::{AtomicPotentialTrait, Simulation};
 
-struct ThreadContainer<T: AtomType> {
+struct ThreadContainer<T: AtomType, A: AtomicPotentialTrait<T>> {
     pub id: thread::ThreadId,
-    pub tx: mpsc::Sender<msg::M2W<T>>,
+    pub tx: mpsc::Sender<msg::M2W<T, A>>,
     pub handle: thread::JoinHandle<()>,
 }
 
 /// Main app, used to run a function through parallel workers
-pub struct Jmd<T: AtomType> {
+pub struct Jmd<T: AtomType, A: AtomicPotentialTrait<T>> {
     rx: mpsc::Receiver<msg::W2M<T>>,
     tx: mpsc::Sender<msg::W2M<T>>,
-    threads: Vec<ThreadContainer<T>>,
+    threads: Vec<ThreadContainer<T, A>>,
 }
-impl<T> Jmd<T>
+impl<T, A> Jmd<T, A>
 where
     T: AtomType + Send + 'static,
+    A: AtomicPotentialTrait<T> + Send + 'static,
 {
     pub fn new() -> Self {
         let (tx, rx) = mpsc::channel();
@@ -150,7 +152,7 @@ where
             }
         }
     }
-    pub fn run(&mut self, num_threads: usize, f: fn(&Worker<T>) -> ()) {
+    pub fn run(&mut self, num_threads: usize, f: fn(Simulation<T, A>) -> ()) {
         self.setup(num_threads);
         for thread in &self.threads {
             thread.tx.send(msg::M2W::Run(f)).unwrap();
