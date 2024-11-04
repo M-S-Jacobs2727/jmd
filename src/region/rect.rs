@@ -1,5 +1,8 @@
-use super::Region;
-use crate::{Axis, Direction, Lattice};
+use super::*;
+use crate::{
+    lattice::Lattice,
+    utils::{Axis, Direction},
+};
 
 use rand;
 #[derive(Clone, Copy, Debug)]

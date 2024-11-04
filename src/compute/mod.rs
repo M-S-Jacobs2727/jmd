@@ -1,8 +1,9 @@
 use crate::{
     atom_type::AtomType,
+    atomic::AtomicPotentialTrait,
     output::{Operatable, Operation, Value},
+    simulation::Simulation,
     traits::Named,
-    AtomicPotentialTrait, Simulation,
 };
 
 mod avg_vsq;

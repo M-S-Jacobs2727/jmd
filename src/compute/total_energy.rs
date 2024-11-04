@@ -1,7 +1,4 @@
-use crate::{atom_type::AtomType, AtomicPotentialTrait, Simulation};
-
-use super::kinetic_energy;
-use super::potential_energy;
+use super::*;
 
 pub(super) fn compute<T, A>(sim: &Simulation<T, A>) -> f64
 where

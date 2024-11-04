@@ -1,7 +1,7 @@
 use std::sync::mpsc;
 
 use super::message::AtomMessage;
-use crate::Direction;
+use crate::utils::Direction;
 
 /// Message transmitters to the six neighboring processes
 pub struct AdjacentProcs {

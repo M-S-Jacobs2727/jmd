@@ -1,16 +1,14 @@
 // TODO: integrate utils::indices
-use std::{
-    sync::mpsc,
-    thread::{self, ThreadId},
-};
+use std::{sync::mpsc, thread};
 
-use super::{message as msg, worker::Worker, AdjacentProcs};
+use super::*;
 use crate::{
     atom_type::AtomType,
     atomic,
+    container::Container,
+    neighbor::NeighborList,
     region::Rect,
-    utils::{indices::Index, Direction},
-    Container, NeighborList,
+    utils::{Direction, Index},
 };
 
 /// Determine and return the best configuration of processes to
@@ -46,8 +44,8 @@ fn procs_in_box(nprocs: usize, lx: f64, ly: f64, lz: f64) -> [usize; 3] {
 
 /// Represents a process in relation to the other neighboring processes
 pub struct Domain<'a, T: AtomType, A: atomic::AtomicPotentialTrait<T>> {
-    receiver: mpsc::Receiver<msg::AtomMessage>,
-    my_sender: mpsc::Sender<msg::AtomMessage>,
+    receiver: mpsc::Receiver<message::AtomMessage>,
+    my_sender: mpsc::Sender<message::AtomMessage>,
     worker: Option<Box<&'a Worker<T, A>>>,
     procs: AdjacentProcs,
     subdomain: Rect,
@@ -109,16 +107,16 @@ impl<'a, T: AtomType, A: atomic::AtomicPotentialTrait<T>> Domain<'a, T, A> {
         // Receive from main Option<mpsc::Sender> for opposite neighbor
         let idx = self.get_neighbor(direction.clone(), container);
         let message = match idx {
-            Some(i) => msg::W2M::Sender(Some(self.my_sender.clone()), i.idx()),
-            None => msg::W2M::Sender(None, 0),
+            Some(i) => message::W2M::Sender(Some(self.my_sender.clone()), i.idx()),
+            None => message::W2M::Sender(None, 0),
         };
         self.worker().send(message);
-        let msg = self.worker().recv();
-        match msg {
-            Ok(msg::M2W::Sender(Some(sender))) => {
+        let message = self.worker().recv();
+        match message {
+            Ok(message::M2W::Sender(Some(sender))) => {
                 self.procs.set(direction.opposite(), sender);
             }
-            Ok(msg::M2W::Sender(None)) => {}
+            Ok(message::M2W::Sender(None)) => {}
             Ok(_) => panic!("Invalid message"),
             _ => panic!("Diconnect Error"),
         };
@@ -262,10 +260,10 @@ impl<'a, T: AtomType, A: atomic::AtomicPotentialTrait<T>> Domain<'a, T, A> {
         }
     }
 
-    pub fn clone_sender(&self) -> mpsc::Sender<msg::AtomMessage> {
+    pub fn clone_sender(&self) -> mpsc::Sender<message::AtomMessage> {
         self.my_sender.clone()
     }
-    pub fn receiver(&self) -> &mpsc::Receiver<msg::AtomMessage> {
+    pub fn receiver(&self) -> &mpsc::Receiver<message::AtomMessage> {
         &self.receiver
     }
     pub fn neighbor_procs(&self) -> &AdjacentProcs {
@@ -274,11 +272,11 @@ impl<'a, T: AtomType, A: atomic::AtomicPotentialTrait<T>> Domain<'a, T, A> {
     pub fn set_neighbor_proc(
         &mut self,
         direction: Direction,
-        sender: mpsc::Sender<msg::AtomMessage>,
+        sender: mpsc::Sender<message::AtomMessage>,
     ) {
         self.procs.set(direction, sender);
     }
-    pub fn thread_ids(&self) -> &Vec<ThreadId> {
+    pub fn thread_ids(&self) -> &Vec<thread::ThreadId> {
         self.worker().thread_ids()
     }
     pub fn num_neighbors(&self) -> usize {
@@ -288,14 +286,14 @@ impl<'a, T: AtomType, A: atomic::AtomicPotentialTrait<T>> Domain<'a, T, A> {
             .filter(|&&p| (*p).is_some())
             .count()
     }
-    pub fn receive(&self) -> msg::AtomMessage {
+    pub fn receive(&self) -> message::AtomMessage {
         self.receiver.recv().expect("Disconnect error")
     }
     pub fn send(
         &self,
-        value: msg::AtomMessage,
+        value: message::AtomMessage,
         neighbor: Direction,
-    ) -> Result<(), mpsc::SendError<msg::AtomMessage>> {
+    ) -> Result<(), mpsc::SendError<message::AtomMessage>> {
         let n = match neighbor {
             Direction::Xlo => self.procs.xlo(),
             Direction::Xhi => self.procs.xhi(),
@@ -309,7 +307,7 @@ impl<'a, T: AtomType, A: atomic::AtomicPotentialTrait<T>> Domain<'a, T, A> {
             None => Ok(()),
         }
     }
-    pub(crate) fn send_to_main(&self, message: msg::W2M<T>) {
+    pub(crate) fn send_to_main(&self, message: message::W2M<T>) {
         self.worker().send(message);
     }
 
@@ -348,7 +346,7 @@ impl<'a, T: AtomType, A: atomic::AtomicPotentialTrait<T>> Domain<'a, T, A> {
         }
     }
 
-    pub(crate) fn send_to_main_once(&self, message: msg::W2M<T>) {
+    pub(crate) fn send_to_main_once(&self, message: message::W2M<T>) {
         if self.proc_location.idx() == 0 {
             self.send_to_main(message);
         }

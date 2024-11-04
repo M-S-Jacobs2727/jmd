@@ -1,5 +1,4 @@
-use super::Integrator;
-use crate::{atom_type::AtomType, AtomicPotentialTrait, Simulation};
+use super::*;
 
 /// Velocity-verlet integrator
 pub struct Verlet {}

@@ -91,8 +91,4 @@ impl<T: AtomType> Atoms<T> {
         self.velocities[i][1] += increment[1];
         self.velocities[i][2] += increment[2];
     }
-    /// Set the velocity of the atom at the given index
-    pub(crate) fn set_velocity(&mut self, i: usize, new_vel: [f64; 3]) {
-        self.velocities[i] = new_vel;
-    }
 }

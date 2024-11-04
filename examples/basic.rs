@@ -1,6 +1,7 @@
 use jmd::atom_type::Basic;
 use jmd::atomic::{LJCut, LJCutCoeff};
-use jmd::*;
+use jmd::lattice::Cubic;
+use jmd::prelude::*;
 
 fn run(mut sim: Simulation<Basic, LJCut>) {
     let lattice = Cubic::from_density(0.8);

@@ -1,5 +1,4 @@
-use super::AtomicPotentialTrait;
-use crate::atom_type::AtomType;
+use super::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct LJCutCoeff {
@@ -82,11 +81,7 @@ impl<T: AtomType> AtomicPotentialTrait<T> for LJCut {
     }
     // TODO: check that forces are not double counted
     // should be newton-pair full, not half, because half neighbor list
-    fn compute_forces(
-        &self,
-        atoms: &crate::Atoms<T>,
-        neighbor_list: &crate::NeighborList,
-    ) -> Vec<[f64; 3]> {
+    fn compute_forces(&self, atoms: &Atoms<T>, neighbor_list: &NeighborList) -> Vec<[f64; 3]> {
         let mut forces: Vec<[f64; 3]> = Vec::new();
         forces.resize(atoms.num_total_atoms(), [0.0, 0.0, 0.0]);
         for i in 0..atoms.nlocal {
@@ -128,11 +123,7 @@ impl<T: AtomType> AtomicPotentialTrait<T> for LJCut {
 
         forces
     }
-    fn compute_potential_energy(
-        &self,
-        atoms: &crate::Atoms<T>,
-        neighbor_list: &crate::NeighborList,
-    ) -> f64 {
+    fn compute_potential_energy(&self, atoms: &Atoms<T>, neighbor_list: &NeighborList) -> f64 {
         let mut energy = 0.0;
 
         for i in 0..atoms.nlocal {

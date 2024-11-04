@@ -1,6 +1,4 @@
-use crate::region::Region;
-
-use super::Lattice;
+use super::*;
 
 #[derive(Debug)]
 pub struct Cubic {

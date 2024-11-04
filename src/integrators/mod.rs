@@ -1,7 +1,8 @@
-mod verlet;
-pub use verlet::Verlet;
+use crate::{atom_type::AtomType, atomic::AtomicPotentialTrait, simulation::Simulation};
 
-use crate::{atom_type::AtomType, AtomicPotentialTrait, Simulation};
+mod verlet;
+
+pub use verlet::Verlet;
 
 /// Simulation integrator
 pub trait Integrator<T, A>

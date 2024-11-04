@@ -4,14 +4,18 @@ use rand_distr::Distribution;
 
 use crate::{
     atom_type::AtomType,
-    atomic,
-    compute::{self, ComputeTrait},
-    output::{self, Value},
+    atomic::AtomicPotentialTrait,
+    atoms::Atoms,
+    compute::{Compute, ComputeTrait},
+    container::{Container, BC},
+    integrators::{Integrator, Verlet},
+    neighbor::NeighborList,
+    output::{Output, OutputSpec, Value},
     parallel::{comm, message as msg, Domain, Worker},
-    utils::KeyedVec,
-    Atoms, Axis, Container, Integrator, NeighborList, Output, OutputSpec, Region, Verlet, BC,
+    region::Region,
+    utils::{Axis, KeyedVec},
 };
-type ComputeVec = KeyedVec<String, compute::Compute>;
+type ComputeVec = KeyedVec<String, Compute>;
 
 struct NLUpdateSettings {
     pub last_update_step: usize,
@@ -24,14 +28,14 @@ struct NLUpdateSettings {
 pub struct Simulation<'a, T, A>
 where
     T: AtomType,
-    A: atomic::AtomicPotentialTrait<T>,
+    A: AtomicPotentialTrait<T>,
 {
     pub(crate) atoms: Atoms<T>,
     container: Rc<Container>,
     atomic_potential: A,
     neighbor_list: NeighborList,
     domain: Domain<'a, T, A>,
-    output: output::Output,
+    output: Output,
     pos_at_prev_nl_build: Vec<[f64; 3]>,
     computes: ComputeVec,
     timestep: f64,
@@ -41,7 +45,7 @@ where
 impl<'a, T, A> Simulation<'a, T, A>
 where
     T: AtomType,
-    A: atomic::AtomicPotentialTrait<T>,
+    A: AtomicPotentialTrait<T>,
 {
     /// Create a new simulation
     pub fn new() -> Self {
@@ -66,7 +70,7 @@ where
             atomic_potential,
             neighbor_list,
             domain: Domain::new(),
-            output: output::Output::new(),
+            output: Output::new(),
             pos_at_prev_nl_build: Vec::new(),
             computes: KeyedVec::new(),
             timestep,
@@ -154,7 +158,7 @@ where
             values: output_specs,
         };
     }
-    pub fn add_compute(&mut self, id: &str, compute: compute::Compute) {
+    pub fn add_compute(&mut self, id: &str, compute: Compute) {
         self.computes.add(String::from(id), compute)
     }
     /// Set the list of atom types
@@ -339,7 +343,9 @@ where
     fn reverse_comm(&mut self) {
         comm::reverse_comm(self);
     }
-    fn post_reverse_comm(&mut self) {}
+    fn post_reverse_comm(&mut self) {
+        Verlet::post_reverse_comm(self);
+    }
 
     // Neighbor list methods
     /// Whether the neighbor list should update on a given step.
@@ -422,8 +428,8 @@ where
 
         for v in &self.output.values {
             let value = match v {
-                output::OutputSpec::Step => Value::Usize(step),
-                output::OutputSpec::Compute(c) => c.compute(&self),
+                OutputSpec::Step => Value::Usize(step),
+                OutputSpec::Compute(c) => c.compute(&self),
             };
             self.domain
                 .send_to_main(msg::W2M::Output(thread::current().id(), value));

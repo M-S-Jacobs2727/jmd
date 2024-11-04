@@ -2,8 +2,11 @@ use std::{sync::mpsc, thread};
 
 use crate::{
     atom_type::AtomType,
+    atomic::AtomicPotentialTrait,
+    atoms::Atoms,
+    container::Container,
     output::{OutputSpec, Value},
-    AtomicPotentialTrait, Atoms, Container, Simulation,
+    simulation::Simulation,
 };
 
 /// Message between procs communicating atom info

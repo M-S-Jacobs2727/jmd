@@ -2,8 +2,8 @@ use std::rc::Rc;
 
 use super::Grid;
 use crate::{
-    utils::{computations::distance_squared, indices::Index},
-    Container,
+    container::Container,
+    utils::{computations::distance_squared, Index},
 };
 
 /// Used for computing a list of neighboring particles
@@ -162,7 +162,7 @@ impl NeighborList {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::BC;
+    use crate::container::BC;
 
     fn setup_nl() -> NeighborList {
         let container = Container::new(0.0, 10.0, 0.0, 10.0, 0.0, 10.0, BC::PP, BC::PP, BC::PP);

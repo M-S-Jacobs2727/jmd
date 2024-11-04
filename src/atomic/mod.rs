@@ -1,10 +1,10 @@
+use crate::{atom_type::AtomType, atoms::Atoms, neighbor::NeighborList};
+
 mod ljcut;
 mod none;
 
 pub use ljcut::{LJCut, LJCutCoeff};
 pub use none::None_;
-
-use crate::{atom_type::AtomType, Atoms, NeighborList};
 
 /// Trait for pairwise atomic potentials
 pub trait AtomicPotentialTrait<T: AtomType> {

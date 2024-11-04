@@ -1,5 +1,4 @@
-use super::AtomicPotentialTrait;
-use crate::{atom_type::AtomType, Atoms, NeighborList};
+use super::*;
 
 pub struct None_ {}
 impl<T: AtomType> AtomicPotentialTrait<T> for None_ {

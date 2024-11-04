@@ -1,4 +1,4 @@
-use super::AtomType;
+use super::*;
 
 #[derive(Clone, Copy, Debug)]
 pub struct Basic {

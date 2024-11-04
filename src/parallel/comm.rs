@@ -1,6 +1,10 @@
+use super::message::AtomMessage;
 use crate::{
-    atom_type::AtomType, parallel::message::AtomMessage, AtomicPotentialTrait, Direction, Rect,
-    Region, Simulation,
+    atom_type::AtomType,
+    atomic::AtomicPotentialTrait,
+    region::{Rect, Region},
+    simulation::Simulation,
+    utils::Direction,
 };
 
 pub(crate) fn reverse_comm<T, A>(sim: &mut Simulation<T, A>)

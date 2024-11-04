@@ -1,9 +1,13 @@
 use std::thread;
 use std::{sync::mpsc, time::Duration};
 
-use crate::atom_type::AtomType;
-use crate::{output::*, parallel::message as msg, parallel::Worker};
-use crate::{AtomicPotentialTrait, Simulation};
+use crate::{
+    atom_type::AtomType,
+    atomic::AtomicPotentialTrait,
+    output::{Operatable, Operation, OutputSpec, Value},
+    parallel::{message as msg, Worker},
+    simulation::Simulation,
+};
 
 struct ThreadContainer<T: AtomType, A: AtomicPotentialTrait<T>> {
     pub id: thread::ThreadId,

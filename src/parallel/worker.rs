@@ -1,18 +1,16 @@
-use std::{
-    sync::mpsc,
-    thread::{self, ThreadId},
-};
+use std::{sync::mpsc, thread};
 
-use crate::{atom_type::AtomType, parallel::message as msg, AtomicPotentialTrait, Simulation};
+use super::*;
+use crate::{atom_type::AtomType, atomic::AtomicPotentialTrait, simulation::Simulation};
 
 /// Channels for communication between each process and the manager
 pub struct Worker<T: AtomType, A: AtomicPotentialTrait<T>> {
-    rx: mpsc::Receiver<msg::M2W<T, A>>,
-    tx: mpsc::Sender<msg::W2M<T>>,
-    thread_ids: Vec<ThreadId>,
+    rx: mpsc::Receiver<message::M2W<T, A>>,
+    tx: mpsc::Sender<message::W2M<T>>,
+    thread_ids: Vec<thread::ThreadId>,
 }
 impl<T: AtomType, A: AtomicPotentialTrait<T>> Worker<T, A> {
-    pub fn new(rx: mpsc::Receiver<msg::M2W<T, A>>, tx: mpsc::Sender<msg::W2M<T>>) -> Self {
+    pub fn new(rx: mpsc::Receiver<message::M2W<T, A>>, tx: mpsc::Sender<message::W2M<T>>) -> Self {
         Self {
             rx,
             tx,
@@ -21,11 +19,11 @@ impl<T: AtomType, A: AtomicPotentialTrait<T>> Worker<T, A> {
     }
     pub fn run_thread(&mut self) {
         self.tx
-            .send(msg::W2M::Id(thread::current().id()))
+            .send(message::W2M::Id(thread::current().id()))
             .expect("Disconnect error");
 
         self.thread_ids =
-            if let msg::M2W::Setup(thread_ids) = self.rx.recv().expect("Disconnect error") {
+            if let message::M2W::Setup(thread_ids) = self.rx.recv().expect("Disconnect error") {
                 thread_ids
             } else {
                 panic!("Invalid communication")
@@ -33,23 +31,23 @@ impl<T: AtomType, A: AtomicPotentialTrait<T>> Worker<T, A> {
 
         self.run();
     }
-    pub fn thread_ids(&self) -> &Vec<ThreadId> {
+    pub fn thread_ids(&self) -> &Vec<thread::ThreadId> {
         &self.thread_ids
     }
-    pub fn send(&self, message: msg::W2M<T>) {
+    pub fn send(&self, message: message::W2M<T>) {
         self.tx.send(message).expect("Disconnect error");
     }
-    pub fn recv(&self) -> Result<msg::M2W<T, A>, mpsc::RecvError> {
+    pub fn recv(&self) -> Result<message::M2W<T, A>, mpsc::RecvError> {
         self.rx.recv()
     }
-    pub fn try_recv(&self) -> Result<msg::M2W<T, A>, mpsc::TryRecvError> {
+    pub fn try_recv(&self) -> Result<message::M2W<T, A>, mpsc::TryRecvError> {
         self.rx.try_recv()
     }
 
     fn run(&self) {
-        let msg = self.rx.recv().unwrap();
-        match msg {
-            msg::M2W::Run(f) => f(Simulation::new()),
+        let message = self.rx.recv().unwrap();
+        match message {
+            message::M2W::Run(f) => f(Simulation::new()),
             _ => panic!("Invalid communication"),
         };
     }

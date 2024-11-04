@@ -3,8 +3,7 @@ use std::{
     ops::{Add, AddAssign},
 };
 
-use crate::compute::Compute;
-use crate::traits::Named;
+use crate::{compute::Compute, traits::Named};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum OutputSpec {

@@ -1,4 +1,5 @@
 mod rect;
+
 pub use rect::Rect;
 
 /// A region of the simulation space

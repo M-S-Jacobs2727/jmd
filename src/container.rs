@@ -1,4 +1,7 @@
-use crate::{region::Rect, Axis, Direction};
+use crate::{
+    region::Rect,
+    utils::{Axis, Direction},
+};
 
 /// Boundary conditions for simulation box.
 ///

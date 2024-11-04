@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use crate::{utils::indices::Index, Container, Rect};
+use crate::{container::Container, region::Rect, utils::Index};
 
 /// Neighbor list grid of bins
 ///
@@ -135,7 +135,7 @@ impl Grid {
 
 #[cfg(test)]
 mod tests {
-    use crate::BC;
+    use crate::container::BC;
 
     use super::*;
     fn setup_grid() -> Grid {
