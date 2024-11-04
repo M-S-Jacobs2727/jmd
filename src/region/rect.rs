@@ -116,15 +116,25 @@ impl Rect {
             Direction::Zhi => self.zhi = bound,
         };
     }
+    pub fn intersect(&self, other: &Self) -> Self {
+        Self {
+            xlo: self.xlo.min(other.xlo),
+            xhi: self.xhi.min(other.xhi),
+            ylo: self.ylo.min(other.ylo),
+            yhi: self.yhi.min(other.yhi),
+            zlo: self.zlo.min(other.zlo),
+            zhi: self.zhi.min(other.zhi),
+        }
+    }
 }
 impl Region for Rect {
     fn contains(&self, coord: &[f64; 3]) -> bool {
         self.xlo <= coord[0]
-            && coord[0] <= self.xhi
+            && coord[0] < self.xhi
             && self.ylo <= coord[1]
-            && coord[1] <= self.yhi
+            && coord[1] < self.yhi
             && self.zlo <= coord[2]
-            && coord[2] <= self.zhi
+            && coord[2] < self.zhi
     }
     fn get_random_coord(&self) -> [f64; 3] {
         [
@@ -135,6 +145,14 @@ impl Region for Rect {
     }
     fn bounding_box(&self) -> Rect {
         self.clone()
+    }
+    fn volume(&self) -> f64 {
+        let l = self.lengths();
+        l[0] * l[1] * l[2]
+    }
+    fn surface_area(&self) -> f64 {
+        let l = self.lengths();
+        2.0 * (l[0] * l[1] + l[0] * l[2] + l[1] * l[2])
     }
 }
 

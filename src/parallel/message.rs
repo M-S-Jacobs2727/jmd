@@ -28,6 +28,7 @@ pub enum W2M<T: AtomType> {
     ProcDims([usize; 3]),
     SetupOutput(Vec<OutputSpec>),
     InitialOutput,
+    Sum(usize),
 }
 
 /// Manager-to-Worker messages
@@ -36,4 +37,5 @@ pub enum M2W<T: AtomType, A: AtomicPotentialTrait<T>> {
     Run(fn(Simulation<T, A>) -> ()),
     Sender(Option<mpsc::Sender<AtomMessage>>),
     ProcDims([usize; 3]),
+    SumResult(usize),
 }

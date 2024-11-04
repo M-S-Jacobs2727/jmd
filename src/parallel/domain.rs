@@ -49,7 +49,7 @@ pub struct Domain<'a, T: AtomType, A: atomic::AtomicPotentialTrait<T>> {
     worker: Option<Box<&'a Worker<T, A>>>,
     procs: AdjacentProcs,
     subdomain: Rect,
-    proc_location: Index,
+    proc_index: Index,
 }
 impl<'a, T: AtomType, A: atomic::AtomicPotentialTrait<T>> Domain<'a, T, A> {
     pub(crate) fn new() -> Self {
@@ -62,7 +62,7 @@ impl<'a, T: AtomType, A: atomic::AtomicPotentialTrait<T>> Domain<'a, T, A> {
             worker: None,
             procs: neighbor_procs,
             subdomain: Rect::new(0.0, 10.0, 0.0, 10.0, 0.0, 10.0),
-            proc_location: Index::new(),
+            proc_index: Index::new(),
         }
     }
     pub(crate) fn init(&mut self, container: &Container, worker: Box<&'a Worker<T, A>>) {
@@ -81,7 +81,7 @@ impl<'a, T: AtomType, A: atomic::AtomicPotentialTrait<T>> Domain<'a, T, A> {
             .iter()
             .position(|&id| thread::current().id() == id)
             .unwrap();
-        self.proc_location = Index::from_1d(idx, proc_dimensions);
+        self.proc_index = Index::from_1d(idx, proc_dimensions);
 
         self.reset_subdomain(container.rect());
 
@@ -95,6 +95,9 @@ impl<'a, T: AtomType, A: atomic::AtomicPotentialTrait<T>> Domain<'a, T, A> {
         ]
         .iter()
         .for_each(|direction| self.setup_neighbor(*direction, container));
+    }
+    pub(crate) fn proc_index(&self) -> usize {
+        self.proc_index.idx()
     }
     pub(crate) fn subdomain(&self) -> &Rect {
         &self.subdomain
@@ -113,26 +116,25 @@ impl<'a, T: AtomType, A: atomic::AtomicPotentialTrait<T>> Domain<'a, T, A> {
         self.worker().send(message);
         let message = self.worker().recv();
         match message {
-            Ok(message::M2W::Sender(Some(sender))) => {
+            message::M2W::Sender(Some(sender)) => {
                 self.procs.set(direction.opposite(), sender);
             }
-            Ok(message::M2W::Sender(None)) => {}
-            Ok(_) => panic!("Invalid message"),
-            _ => panic!("Diconnect Error"),
+            message::M2W::Sender(None) => {}
+            _ => panic!("Invalid message"),
         };
     }
     pub fn initialized(&self) -> bool {
         self.worker.is_some()
     }
     pub fn reset_subdomain(&mut self, rect: &Rect) {
-        let bounds = self.proc_location.bounds();
+        let bounds = self.proc_index.bounds();
         let l = [
             rect.lx() / (bounds[0] as f64),
             rect.ly() / (bounds[1] as f64),
             rect.lz() / (bounds[2] as f64),
         ];
         let lo = rect.lo();
-        let idx3d = self.proc_location.to_3d();
+        let idx3d = self.proc_index.to_3d();
         let sdlo = [
             lo[0] + l[0] * idx3d[0] as f64,
             lo[1] + l[1] * idx3d[1] as f64,
@@ -310,11 +312,14 @@ impl<'a, T: AtomType, A: atomic::AtomicPotentialTrait<T>> Domain<'a, T, A> {
     pub(crate) fn send_to_main(&self, message: message::W2M<T>) {
         self.worker().send(message);
     }
+    pub(crate) fn recv_from_main(&self) -> message::M2W<T, A> {
+        self.worker().recv()
+    }
 
     fn get_neighbor(&self, direction: Direction, container: &Container) -> Option<Index> {
         let axis_index = direction.axis().index();
-        let my_idx = self.proc_location.to_3d();
-        let bounds = self.proc_location.bounds();
+        let my_idx = self.proc_index.to_3d();
+        let bounds = self.proc_index.bounds();
 
         let i = my_idx[axis_index];
         let n = bounds[axis_index];
@@ -347,7 +352,7 @@ impl<'a, T: AtomType, A: atomic::AtomicPotentialTrait<T>> Domain<'a, T, A> {
     }
 
     pub(crate) fn send_to_main_once(&self, message: message::W2M<T>) {
-        if self.proc_location.idx() == 0 {
+        if self.proc_index.idx() == 0 {
             self.send_to_main(message);
         }
     }

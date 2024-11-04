@@ -114,6 +114,19 @@ where
         }
         println!();
     }
+    fn sum(&self, mut value: usize) {
+        for _ in 0..self.threads.len() - 1 {
+            let message = self.receive();
+            match message {
+                msg::W2M::Sum(v) => value += v,
+                _ => panic!("Invalid message"),
+            }
+        }
+        for t in &self.threads {
+            t.tx.send(msg::M2W::SumResult(value))
+                .expect("Disconnect error")
+        }
+    }
     fn handle_message(
         &self,
         message: msg::W2M<T>,
@@ -131,6 +144,7 @@ where
             msg::W2M::SetupOutput(specs) => *output_spec = specs,
             msg::W2M::Output(id, value) => self.output(id, value, &output_spec),
             msg::W2M::InitialOutput => self.initial_output(output_spec),
+            msg::W2M::Sum(value) => self.sum(value),
             _ => {}
         };
     }

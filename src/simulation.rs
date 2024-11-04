@@ -12,7 +12,7 @@ use crate::{
     neighbor::NeighborList,
     output::{Output, OutputSpec, Value},
     parallel::{comm, message as msg, Domain, Worker},
-    region::Region,
+    region::{Rect, Region},
     utils::{Axis, KeyedVec},
 };
 type ComputeVec = KeyedVec<String, Compute>;
@@ -205,23 +205,35 @@ where
     // Atoms methods
 
     /// Add a given number of atoms of the given type with the given region
-    /// TODO: refactor to work correctly with more than one process
-    pub fn add_random_atoms(&mut self, region: &impl Region, num_atoms: usize, atom_type: usize) {
+    pub fn add_random_atoms(&mut self, rect: &Rect, num_atoms: usize, atom_type: usize) {
+        let sub_region = rect.intersect(self.domain.subdomain());
+        let mut my_natoms =
+            (sub_region.volume() / rect.volume() * num_atoms as f64).floor() as usize;
+        self.domain.send_to_main(msg::W2M::Sum(my_natoms));
+        let message = self.domain.recv_from_main();
+        let added_natoms = match message {
+            msg::M2W::SumResult(sum) => sum,
+            _ => panic!("Invalid message"),
+        };
+        if self.domain.proc_index() < num_atoms - added_natoms {
+            my_natoms += 1;
+        }
+
         let atoms = &mut self.atoms;
         let atom_id = match atoms.ids().iter().max() {
             Some(j) => j + 1,
             None => 0,
         };
-        atoms.ids.extend(atom_id..atom_id + num_atoms);
-        atoms.types.reserve(num_atoms);
-        atoms.positions.reserve(num_atoms);
-        atoms.velocities.reserve(num_atoms);
-        atoms.nlocal += num_atoms;
+        atoms.ids.extend(atom_id..atom_id + my_natoms);
+        atoms.types.reserve(my_natoms);
+        atoms.positions.reserve(my_natoms);
+        atoms.velocities.reserve(my_natoms);
+        atoms.nlocal += my_natoms;
 
-        for _i in 0..num_atoms {
+        for _i in 0..my_natoms {
             atoms.types.push(atom_type);
             atoms.velocities.push([0.0, 0.0, 0.0]);
-            atoms.positions.push(region.get_random_coord())
+            atoms.positions.push(sub_region.get_random_coord())
         }
     }
     /// Add atoms of the given type at the given coordinates
@@ -232,17 +244,24 @@ where
             Some(j) => j + 1,
             None => 0,
         };
-        atoms.ids.extend(atom_id..atom_id + num_atoms);
+
+        atoms.ids.reserve(num_atoms);
         atoms.types.reserve(num_atoms);
         atoms.positions.reserve(num_atoms);
         atoms.velocities.reserve(num_atoms);
-        atoms.nlocal += num_atoms;
 
-        for i in 0..num_atoms {
-            atoms.types.push(atom_type);
-            atoms.velocities.push([0.0, 0.0, 0.0]);
-            atoms.positions.push(coords[i])
-        }
+        let mut atoms_added = 0;
+        coords
+            .iter()
+            .enumerate()
+            .filter(|(_i, coord)| self.domain.subdomain().contains(coord))
+            .for_each(|(i, coord)| {
+                atoms_added += 1;
+                atoms.ids.push(atom_id + i);
+                atoms.types.push(atom_type);
+                atoms.positions.push(*coord);
+                atoms.velocities.push([0.0, 0.0, 0.0]);
+            });
     }
     /// Set the temperature
     /// TODO: move to simulation, make work across multiple processes

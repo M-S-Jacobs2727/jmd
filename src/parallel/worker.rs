@@ -37,8 +37,8 @@ impl<T: AtomType, A: AtomicPotentialTrait<T>> Worker<T, A> {
     pub fn send(&self, message: message::W2M<T>) {
         self.tx.send(message).expect("Disconnect error");
     }
-    pub fn recv(&self) -> Result<message::M2W<T, A>, mpsc::RecvError> {
-        self.rx.recv()
+    pub fn recv(&self) -> message::M2W<T, A> {
+        self.rx.recv().expect("Disconnect error")
     }
     pub fn try_recv(&self) -> Result<message::M2W<T, A>, mpsc::TryRecvError> {
         self.rx.try_recv()
