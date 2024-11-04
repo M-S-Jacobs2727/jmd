@@ -75,7 +75,7 @@ impl LJCut {
 }
 
 impl<T: AtomType> AtomicPotentialTrait<T> for LJCut {
-    type CoeffType = LJCutCoeff;
+    type Coeff = LJCutCoeff;
     fn cutoff_distance(&self) -> f64 {
         self.force_cutoff
     }

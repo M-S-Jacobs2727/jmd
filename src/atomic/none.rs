@@ -8,7 +8,7 @@ impl None_ {
     }
 }
 impl<T: AtomType> AtomicPotentialTrait<T> for None_ {
-    type CoeffType = ();
+    type Coeff = ();
     fn cutoff_distance(&self) -> f64 {
         0.0
     }

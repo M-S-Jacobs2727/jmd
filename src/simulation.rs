@@ -42,7 +42,7 @@ where
     A: atomic::AtomicPotentialTrait<T>,
 {
     /// Create a new simulation
-    pub fn new(timestep: f64, atoms: Atoms<T>, atomic_potential: A, container: Container) -> Self {
+    pub fn new(timestep: f64, atomic_potential: A, container: Container) -> Self {
         assert!(
             timestep > 0.0,
             "Timestep should be positive, found {}",
@@ -52,7 +52,7 @@ where
         let neighbor_list =
             NeighborList::new(container.clone(), atomic_potential.cutoff_distance(), 1.0);
         Self {
-            atoms,
+            atoms: Atoms::new(),
             container,
             atomic_potential,
             neighbor_list,

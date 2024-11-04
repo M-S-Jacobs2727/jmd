@@ -8,7 +8,7 @@ use crate::{atom_type::AtomType, Atoms, NeighborList};
 
 /// Trait for pairwise atomic potentials
 pub trait AtomicPotentialTrait<T: AtomType> {
-    type CoeffType;
+    type Coeff;
 
     /// Get the maximum distance for effective interaction
     fn cutoff_distance(&self) -> f64;
