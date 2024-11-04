@@ -6,5 +6,5 @@ where
     A: AtomicPotentialTrait<T>,
 {
     sim.atomic_potential()
-        .compute_potential_energy(&sim.atoms, &sim.neighbor_list)
+        .compute_potential_energy(&sim.atoms, sim.nl())
 }

@@ -26,4 +26,5 @@ impl<T: AtomType> AtomicPotentialTrait<T> for None_ {
     fn all_set(&self) -> bool {
         true
     }
+    fn set_coeff(&mut self, _typei: usize, _typej: usize, _coeff: &Self::Coeff) {}
 }

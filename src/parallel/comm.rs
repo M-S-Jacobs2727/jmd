@@ -95,7 +95,7 @@ where
         .send(AtomMessage::Idxs(ids), direction)
         .unwrap();
 
-    sim.atoms.remove_idxs(atom_idxs);
+    sim.remove_idxs(atom_idxs);
 }
 
 fn recv_atoms<T, A>(sim: &mut Simulation<T, A>)
@@ -244,10 +244,7 @@ where
     T: AtomType,
     A: AtomicPotentialTrait<T>,
 {
-    let ids = gather_ghost_ids(
-        sim,
-        &sim.domain().get_outer_rect(&direction, &sim.neighbor_list),
-    );
+    let ids = gather_ghost_ids(sim, &sim.domain().get_outer_rect(&direction, sim.nl()));
     let mut send_forces: Vec<[f64; 3]> = Vec::new();
     send_forces.reserve(ids.len());
 
@@ -276,10 +273,7 @@ where
     T: AtomType,
     A: AtomicPotentialTrait<T>,
 {
-    let idxs = gather_owned_idxs(
-        sim,
-        &sim.domain().get_inner_rect(&direction, &sim.neighbor_list),
-    );
+    let idxs = gather_owned_idxs(sim, &sim.domain().get_inner_rect(&direction, sim.nl()));
     fn gather<T: Copy>(idxs: &Vec<usize>, vec: &Vec<T>) -> Vec<T> {
         idxs.iter().map(|i| vec[*i]).collect()
     }

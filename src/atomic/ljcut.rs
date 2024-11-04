@@ -67,16 +67,6 @@ impl LJCut {
         );
         self.force_cutoff = cutoff;
     }
-    pub fn set_coeff<T: AtomType>(&mut self, typei: usize, typej: usize, coeff: &LJCutCoeff) {
-        assert!(
-            typei < self.num_types && typej < self.num_types,
-            "Type indices should be less than the number of types (0-indexed)"
-        );
-
-        let index = <Self as AtomicPotentialTrait<T>>::type_idx(self, typei, typej);
-        self.coeff_set[index] = true;
-        self.coeffs[index] = coeff.clone();
-    }
     fn default_coeff() -> LJCutCoeff {
         LJCutCoeff::new(0.0, 0.0, 0.0)
     }
@@ -246,5 +236,15 @@ impl<T: AtomType> AtomicPotentialTrait<T> for LJCut {
     }
     fn all_set(&self) -> bool {
         self.coeff_set.iter().all(|&x| x)
+    }
+    fn set_coeff(&mut self, typei: usize, typej: usize, coeff: &Self::Coeff) {
+        assert!(
+            typei < self.num_types && typej < self.num_types,
+            "Type indices should be less than the number of types (0-indexed)"
+        );
+
+        let index = <Self as AtomicPotentialTrait<T>>::type_idx(self, typei, typej);
+        self.coeff_set[index] = true;
+        self.coeffs[index] = coeff.clone();
     }
 }

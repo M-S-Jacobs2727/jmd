@@ -29,4 +29,5 @@ pub trait AtomicPotentialTrait<T: AtomType> {
     }
 
     fn all_set(&self) -> bool;
+    fn set_coeff(&mut self, typei: usize, typej: usize, coeff: &Self::Coeff);
 }

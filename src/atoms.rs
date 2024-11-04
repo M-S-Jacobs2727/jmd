@@ -1,8 +1,6 @@
 use std::fmt::Debug;
 
-use rand_distr::Distribution;
-
-use crate::{atom_type::AtomType, region::Region};
+use crate::atom_type::AtomType;
 
 /// Atom properties during simulation, not including forces
 #[derive(Debug)]
@@ -96,85 +94,5 @@ impl<T: AtomType> Atoms<T> {
     /// Set the velocity of the atom at the given index
     pub(crate) fn set_velocity(&mut self, i: usize, new_vel: [f64; 3]) {
         self.velocities[i] = new_vel;
-    }
-    /// Add a given number of atoms of the given type with the given region
-    /// TODO: refactor to work correctly with more than one process
-    pub fn add_random_atoms(&mut self, region: &impl Region, num_atoms: usize, atom_type: usize) {
-        let atom_id = match self.ids().iter().max() {
-            Some(j) => j + 1,
-            None => 0,
-        };
-        self.ids.extend(atom_id..atom_id + num_atoms);
-        self.types.reserve(num_atoms);
-        self.positions.reserve(num_atoms);
-        self.velocities.reserve(num_atoms);
-        self.nlocal += num_atoms;
-
-        for _i in 0..num_atoms {
-            self.types.push(atom_type);
-            self.velocities.push([0.0, 0.0, 0.0]);
-            self.positions.push(region.get_random_coord())
-        }
-    }
-    /// Add atoms of the given type at the given coordinates
-    pub fn add_atoms(&mut self, atom_type: usize, coords: Vec<[f64; 3]>) {
-        let num_atoms = coords.len();
-        let atom_id = match self.ids().iter().max() {
-            Some(j) => j + 1,
-            None => 0,
-        };
-        self.ids.extend(atom_id..atom_id + num_atoms);
-        self.types.reserve(num_atoms);
-        self.positions.reserve(num_atoms);
-        self.velocities.reserve(num_atoms);
-        self.nlocal += num_atoms;
-
-        for i in 0..num_atoms {
-            self.types.push(atom_type);
-            self.velocities.push([0.0, 0.0, 0.0]);
-            self.positions.push(coords[i])
-        }
-    }
-    /// Set the temperature
-    /// TODO: move to simulation, make work across multiple processes
-    pub fn set_temperature(&mut self, temperature: f64) {
-        let mut rng = rand::thread_rng();
-        let dist = rand_distr::Normal::new(0.0, temperature.sqrt()).expect("Invalid temperature");
-        let sqrt_ke: Vec<f64> = dist.sample_iter(&mut rng).take(self.nlocal * 3).collect();
-        for i in 0..self.nlocal {
-            self.velocities[i] = [
-                sqrt_ke[3 * i + 0] / self.atom_types[self.types[i]].mass().sqrt(),
-                sqrt_ke[3 * i + 1] / self.atom_types[self.types[i]].mass().sqrt(),
-                sqrt_ke[3 * i + 2] / self.atom_types[self.types[i]].mass().sqrt(),
-            ];
-        }
-    }
-    /// Remove atoms at the given indices
-    /// TODO: change to IDs instead, add convenience functions for regions
-    pub(crate) fn remove_idxs(&mut self, atom_idxs: Vec<usize>) {
-        let num_local = atom_idxs.iter().filter(|&i| *i < self.nlocal).count();
-        self.nlocal -= num_local;
-        fn filter_by_idx<T: Copy>(atom_idxs: &Vec<usize>, vec: &Vec<T>) -> Vec<T> {
-            vec.iter()
-                .enumerate()
-                .filter_map(|(i, x)| {
-                    if atom_idxs.contains(&i) {
-                        None
-                    } else {
-                        Some(*x)
-                    }
-                })
-                .collect()
-        }
-
-        self.ids = filter_by_idx(&atom_idxs, &self.ids);
-        self.types = filter_by_idx(&atom_idxs, &self.types);
-        self.positions = filter_by_idx(&atom_idxs, &self.positions);
-        self.velocities = filter_by_idx(&atom_idxs, &self.velocities);
-    }
-    /// Set the list of atom types
-    /// TODO: Check if this needs to include side effects
-    pub(crate) fn set_atom_types(&mut self, atom_types: Vec<T>) {
-        self.atom_types = atom_types
     }
 }

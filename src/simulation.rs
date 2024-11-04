@@ -1,5 +1,7 @@
 use std::{rc::Rc, thread};
 
+use rand_distr::Distribution;
+
 use crate::{
     atom_type::AtomType,
     atomic,
@@ -7,7 +9,7 @@ use crate::{
     output::{self, Value},
     parallel::{comm, message as msg, Domain, Worker},
     utils::KeyedVec,
-    Atoms, Axis, Container, Integrator, NeighborList, Output, OutputSpec, Verlet, BC,
+    Atoms, Axis, Container, Integrator, NeighborList, Output, OutputSpec, Region, Verlet, BC,
 };
 type ComputeVec = KeyedVec<String, compute::Compute>;
 
@@ -24,10 +26,10 @@ where
     T: AtomType,
     A: atomic::AtomicPotentialTrait<T>,
 {
-    pub atoms: Atoms<T>,
+    pub(crate) atoms: Atoms<T>,
     container: Rc<Container>,
     atomic_potential: A,
-    pub neighbor_list: NeighborList,
+    neighbor_list: NeighborList,
     domain: Domain<'a, T, A>,
     output: output::Output,
     pos_at_prev_nl_build: Vec<[f64; 3]>,
@@ -111,6 +113,13 @@ where
     pub(crate) fn mut_forces(&mut self) -> &mut Vec<[f64; 3]> {
         &mut self.forces
     }
+    pub fn neighbor_list(&self) -> &NeighborList {
+        &self.neighbor_list
+    }
+    /// Alias for `Simulation::neighbor_list()`
+    pub fn nl(&self) -> &NeighborList {
+        &self.neighbor_list
+    }
 
     // Setters
     pub fn set_container(&mut self, container: Container) {
@@ -148,9 +157,11 @@ where
     pub fn add_compute(&mut self, id: &str, compute: compute::Compute) {
         self.computes.add(String::from(id), compute)
     }
+    /// Set the list of atom types
+    /// TODO: Check if this needs to include side effects
     pub fn set_atom_types(&mut self, atom_types: Vec<T>) {
         let num_types = atom_types.len();
-        self.atoms.set_atom_types(atom_types);
+        self.atoms.atom_types = atom_types;
         self.atomic_potential.set_num_types(num_types);
     }
     pub fn set_atomic_potential(&mut self, atomic_potential: A) {
@@ -168,6 +179,13 @@ where
         );
         self.timestep = timestep;
     }
+
+    pub fn set_atomic_coeff(&mut self, typei: usize, typej: usize, coeff: &A::Coeff) {
+        self.atomic_potential.set_coeff(typei, typej, coeff);
+    }
+
+    // Neighbor list methods
+
     pub fn set_nl_update(&mut self, every: usize, delay: usize, check: bool) {
         self.nl_update_settings = NLUpdateSettings {
             every,
@@ -175,6 +193,91 @@ where
             check,
             last_update_step: 0,
         };
+    }
+    pub fn set_nl_skin_distance(&mut self, skin_distance: f64) {
+        self.neighbor_list.set_skin_distance(skin_distance);
+    }
+
+    // Atoms methods
+
+    /// Add a given number of atoms of the given type with the given region
+    /// TODO: refactor to work correctly with more than one process
+    pub fn add_random_atoms(&mut self, region: &impl Region, num_atoms: usize, atom_type: usize) {
+        let atoms = &mut self.atoms;
+        let atom_id = match atoms.ids().iter().max() {
+            Some(j) => j + 1,
+            None => 0,
+        };
+        atoms.ids.extend(atom_id..atom_id + num_atoms);
+        atoms.types.reserve(num_atoms);
+        atoms.positions.reserve(num_atoms);
+        atoms.velocities.reserve(num_atoms);
+        atoms.nlocal += num_atoms;
+
+        for _i in 0..num_atoms {
+            atoms.types.push(atom_type);
+            atoms.velocities.push([0.0, 0.0, 0.0]);
+            atoms.positions.push(region.get_random_coord())
+        }
+    }
+    /// Add atoms of the given type at the given coordinates
+    pub fn add_atoms(&mut self, atom_type: usize, coords: Vec<[f64; 3]>) {
+        let atoms = &mut self.atoms;
+        let num_atoms = coords.len();
+        let atom_id = match atoms.ids().iter().max() {
+            Some(j) => j + 1,
+            None => 0,
+        };
+        atoms.ids.extend(atom_id..atom_id + num_atoms);
+        atoms.types.reserve(num_atoms);
+        atoms.positions.reserve(num_atoms);
+        atoms.velocities.reserve(num_atoms);
+        atoms.nlocal += num_atoms;
+
+        for i in 0..num_atoms {
+            atoms.types.push(atom_type);
+            atoms.velocities.push([0.0, 0.0, 0.0]);
+            atoms.positions.push(coords[i])
+        }
+    }
+    /// Set the temperature
+    /// TODO: move to simulation, make work across multiple processes
+    pub fn set_temperature(&mut self, temperature: f64) {
+        let atoms = &mut self.atoms;
+        let mut rng = rand::thread_rng();
+        let dist = rand_distr::Normal::new(0.0, temperature.sqrt()).expect("Invalid temperature");
+        let sqrt_ke: Vec<f64> = dist.sample_iter(&mut rng).take(atoms.nlocal * 3).collect();
+        for i in 0..atoms.nlocal {
+            atoms.velocities[i] = [
+                sqrt_ke[3 * i + 0] / atoms.atom_types[atoms.types[i]].mass().sqrt(),
+                sqrt_ke[3 * i + 1] / atoms.atom_types[atoms.types[i]].mass().sqrt(),
+                sqrt_ke[3 * i + 2] / atoms.atom_types[atoms.types[i]].mass().sqrt(),
+            ];
+        }
+    }
+    /// Remove atoms at the given indices
+    /// TODO: change to IDs instead, add convenience functions for regions
+    pub(crate) fn remove_idxs(&mut self, atom_idxs: Vec<usize>) {
+        let atoms = &mut self.atoms;
+        let num_local = atom_idxs.iter().filter(|&i| *i < atoms.nlocal).count();
+        atoms.nlocal -= num_local;
+        fn filter_by_idx<T: Copy>(atom_idxs: &Vec<usize>, vec: &Vec<T>) -> Vec<T> {
+            vec.iter()
+                .enumerate()
+                .filter_map(|(i, x)| {
+                    if atom_idxs.contains(&i) {
+                        None
+                    } else {
+                        Some(*x)
+                    }
+                })
+                .collect()
+        }
+
+        atoms.ids = filter_by_idx(&atom_idxs, &atoms.ids);
+        atoms.types = filter_by_idx(&atom_idxs, &atoms.types);
+        atoms.positions = filter_by_idx(&atom_idxs, &atoms.positions);
+        atoms.velocities = filter_by_idx(&atom_idxs, &atoms.velocities);
     }
 
     // Other public functions
