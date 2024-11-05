@@ -1,4 +1,4 @@
-use super::message::AtomMessage;
+use super::*;
 use crate::{
     atom_type::AtomType,
     atomic::AtomicPotentialTrait,

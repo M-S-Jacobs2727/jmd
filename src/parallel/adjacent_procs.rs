@@ -1,6 +1,6 @@
 use std::sync::mpsc;
 
-use super::message::AtomMessage;
+use super::*;
 use crate::utils::Direction;
 
 /// Message transmitters to the six neighboring processes

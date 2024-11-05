@@ -1,24 +1,23 @@
-use std::thread;
-use std::{sync::mpsc, time::Duration};
+use std::{sync::mpsc, thread, time::Duration};
 
 use crate::{
     atom_type::AtomType,
     atomic::AtomicPotentialTrait,
     output::{Operatable, Operation, OutputSpec, Value},
-    parallel::{message as msg, Worker},
+    parallel::{Worker, M2W, W2M},
     simulation::Simulation,
 };
 
 struct ThreadContainer<T: AtomType, A: AtomicPotentialTrait<T>> {
     pub id: thread::ThreadId,
-    pub tx: mpsc::Sender<msg::M2W<T, A>>,
+    pub tx: mpsc::Sender<M2W<T, A>>,
     pub handle: thread::JoinHandle<()>,
 }
 
 /// Main app, used to run a function through parallel workers
 pub struct Jmd<T: AtomType, A: AtomicPotentialTrait<T>> {
-    rx: mpsc::Receiver<msg::W2M<T>>,
-    tx: mpsc::Sender<msg::W2M<T>>,
+    rx: mpsc::Receiver<W2M<T>>,
+    tx: mpsc::Sender<W2M<T>>,
     threads: Vec<ThreadContainer<T, A>>,
 }
 impl<T, A> Jmd<T, A>
@@ -37,11 +36,11 @@ where
     fn setup(&mut self, num_threads: usize) {
         for _ in 0..num_threads {
             let (tx2, rx2) = mpsc::channel();
-            let mut main_thread = Worker::new(rx2, self.tx.clone());
+            let mut thread = Worker::new(rx2, self.tx.clone());
 
-            let handle = thread::spawn(move || main_thread.run_thread());
-            let result = self.rx.recv().expect("Disconnect error");
-            if let msg::W2M::Id(id) = result {
+            let handle = thread::spawn(move || thread.run_thread());
+            let result = self.recv();
+            if let W2M::Id(id) = result {
                 self.threads.push(ThreadContainer {
                     id,
                     tx: tx2,
@@ -53,15 +52,24 @@ where
         }
 
         let thread_ids: Vec<thread::ThreadId> = self.threads.iter().map(|c| c.id).collect();
-        for thread in &self.threads {
-            thread
-                .tx
-                .send(msg::M2W::Setup(thread_ids.clone()))
-                .expect("Disconnect error");
+        for t in 0..self.threads.len() {
+            self.send(t, M2W::Setup(thread_ids.clone()));
         }
     }
-    fn receive(&self) -> msg::W2M<T> {
-        self.rx.recv().expect("All procs diconnected")
+    fn recv(&self) -> W2M<T> {
+        self.rx.recv().expect("Disconnect error")
+    }
+    fn send(&self, thread_idx: usize, msg: M2W<T, A>) {
+        self.threads[thread_idx]
+            .tx
+            .send(msg)
+            .expect("Disconnect error");
+    }
+    fn initial_output(&self, output_spec: &Vec<OutputSpec>) {
+        for spec in output_spec {
+            print!("{}\t", spec)
+        }
+        println!();
     }
     fn output(&self, id: thread::ThreadId, value: Value, output_spec: &Vec<OutputSpec>) {
         let num_messages_expected = self.threads.len() * output_spec.len();
@@ -77,9 +85,9 @@ where
             .expect("Invalid thread id");
         values_per_thread[idx].push(value);
         for _i in 1..num_messages_expected {
-            let message = self.receive();
+            let message = self.recv();
             match message {
-                msg::W2M::Output(id, value) => {
+                W2M::Output(id, value) => {
                     let idx = self
                         .threads
                         .iter()
@@ -116,35 +124,34 @@ where
     }
     fn sum(&self, mut value: usize) {
         for _ in 0..self.threads.len() - 1 {
-            let message = self.receive();
+            let message = self.recv();
             match message {
-                msg::W2M::Sum(v) => value += v,
+                W2M::Sum(v) => value += v,
                 _ => panic!("Invalid message"),
             }
         }
-        for t in &self.threads {
-            t.tx.send(msg::M2W::SumResult(value))
-                .expect("Disconnect error")
+        for t in 0..self.threads.len() {
+            self.send(t, M2W::SumResult(value));
         }
     }
     fn handle_message(
         &self,
-        message: msg::W2M<T>,
+        message: W2M<T>,
         threads_complete: &mut usize,
         output_spec: &mut Vec<OutputSpec>,
     ) {
         match message {
-            msg::W2M::Complete => *threads_complete += 1,
-            msg::W2M::ProcDims(pd) => {
+            W2M::Complete => *threads_complete += 1,
+            W2M::ProcDims(pd) => {
                 for t in &self.threads {
-                    t.tx.send(msg::M2W::ProcDims(pd.clone())).unwrap();
+                    t.tx.send(M2W::ProcDims(pd.clone())).unwrap();
                 }
             }
-            msg::W2M::Sender(tx, idx) => self.threads[idx].tx.send(msg::M2W::Sender(tx)).unwrap(),
-            msg::W2M::SetupOutput(specs) => *output_spec = specs,
-            msg::W2M::Output(id, value) => self.output(id, value, &output_spec),
-            msg::W2M::InitialOutput => self.initial_output(output_spec),
-            msg::W2M::Sum(value) => self.sum(value),
+            W2M::Sender(tx, idx) => self.threads[idx].tx.send(M2W::Sender(tx)).unwrap(),
+            W2M::SetupOutput(specs) => *output_spec = specs,
+            W2M::Output(id, value) => self.output(id, value, &output_spec),
+            W2M::InitialOutput => self.initial_output(output_spec),
+            W2M::Sum(value) => self.sum(value),
             _ => {}
         };
     }
@@ -172,16 +179,9 @@ where
     }
     pub fn run(&mut self, num_threads: usize, f: fn(Simulation<T, A>) -> ()) {
         self.setup(num_threads);
-        for thread in &self.threads {
-            thread.tx.send(msg::M2W::Run(f)).unwrap();
+        for t in 0..self.threads.len() {
+            self.send(t, M2W::Run(f));
         }
         self.manage_comm();
-    }
-
-    fn initial_output(&self, output_spec: &Vec<OutputSpec>) {
-        for spec in output_spec {
-            print!("{}\t", spec)
-        }
-        println!();
     }
 }

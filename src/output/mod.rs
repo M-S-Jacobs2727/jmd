@@ -13,7 +13,7 @@ pub enum OutputSpec {
 impl Display for OutputSpec {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
-            OutputSpec::Step => "Step",
+            OutputSpec::Step => "step",
             OutputSpec::Compute(c) => c.name(),
         };
         String::from(s).fmt(f)

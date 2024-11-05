@@ -32,6 +32,7 @@ pub enum W2M<T: AtomType> {
 }
 
 /// Manager-to-Worker messages
+#[derive(Clone, Debug)]
 pub enum M2W<T: AtomType, A: AtomicPotentialTrait<T>> {
     Setup(Vec<thread::ThreadId>),
     Run(fn(Simulation<T, A>) -> ()),
