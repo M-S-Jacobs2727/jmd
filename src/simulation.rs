@@ -11,7 +11,7 @@ use crate::{
     integrators::{Integrator, Verlet},
     neighbor::NeighborList,
     output::{Output, OutputSpec, Value},
-    parallel::{comm, message as msg, Domain, Worker},
+    parallel::{comm, Domain, Worker, M2W, W2M},
     region::{Rect, Region},
     utils::{Axis, KeyedVec},
 };
@@ -50,18 +50,19 @@ where
     /// Create a new simulation
     pub fn new() -> Self {
         let timestep = 1.0;
+        let atomic_potential = A::new();
+        let dist = atomic_potential.cutoff_distance() * 3.0;
         let container = Rc::new(Container::new(
             0.0,
-            1.0,
+            dist,
             0.0,
-            1.0,
+            dist,
             0.0,
-            1.0,
+            dist,
             BC::PP,
             BC::PP,
             BC::PP,
         ));
-        let atomic_potential = A::new();
         let neighbor_list =
             NeighborList::new(container.clone(), atomic_potential.cutoff_distance(), 1.0);
         Self {
@@ -151,12 +152,12 @@ where
             })
             .collect();
 
-        self.domain
-            .send_to_main(msg::W2M::SetupOutput(self.output.values.clone()));
         self.output = Output {
             every,
             values: output_specs,
         };
+        self.domain
+            .send_to_main(W2M::SetupOutput(self.output.values.clone()));
     }
     pub fn add_compute(&mut self, id: &str, compute: Compute) {
         self.computes.add(String::from(id), compute)
@@ -174,6 +175,7 @@ where
                 .set_force_distance(atomic_potential.cutoff_distance());
         }
         self.atomic_potential = atomic_potential;
+        self.atomic_potential.set_num_types(self.atoms.num_types());
     }
     pub fn set_timestep(&mut self, timestep: f64) {
         assert!(
@@ -209,10 +211,10 @@ where
         let sub_region = rect.intersect(self.domain.subdomain());
         let mut my_natoms =
             (sub_region.volume() / rect.volume() * num_atoms as f64).floor() as usize;
-        self.domain.send_to_main(msg::W2M::Sum(my_natoms));
+        self.domain.send_to_main(W2M::Sum(my_natoms));
         let message = self.domain.recv_from_main();
         let added_natoms = match message {
-            msg::M2W::SumResult(sum) => sum,
+            M2W::SumResult(sum) => sum,
             _ => panic!("Invalid message"),
         };
         if self.domain.proc_index() < num_atoms - added_natoms {
@@ -262,6 +264,8 @@ where
                 atoms.positions.push(*coord);
                 atoms.velocities.push([0.0, 0.0, 0.0]);
             });
+        atoms.nlocal += atoms_added;
+        atoms.num_atoms_global += coords.len();
     }
     /// Set the temperature
     /// TODO: move to simulation, make work across multiple processes
@@ -308,6 +312,8 @@ where
         self.pre_check();
 
         self.initial_output();
+        self.build_neighbor_list();
+        self.compute_forces();
 
         for step in 0..=num_steps {
             // Forward communication
@@ -320,7 +326,7 @@ where
 
             // Compute forces
             self.pre_force();
-            self.forces = self.compute_forces();
+            self.compute_forces();
 
             // Reverse communication
             self.pre_reverse_comm();
@@ -352,9 +358,10 @@ where
     fn post_forward_comm(&mut self) {}
     fn pre_force(&mut self) {}
     /// Compute the atomic potential, etc. forces acting on the atoms
-    fn compute_forces(&self) -> Vec<[f64; 3]> {
-        self.atomic_potential
-            .compute_forces(&self.atoms, &self.neighbor_list)
+    fn compute_forces(&mut self) {
+        self.forces = self
+            .atomic_potential
+            .compute_forces(&self.atoms, &self.neighbor_list);
     }
     fn pre_reverse_comm(&mut self) {}
     /// Reverse communication: communicating the forces of ghost atoms back to the owning
@@ -451,10 +458,10 @@ where
                 OutputSpec::Compute(c) => c.compute(&self),
             };
             self.domain
-                .send_to_main(msg::W2M::Output(thread::current().id(), value));
+                .send_to_main(W2M::Output(thread::current().id(), value));
         }
     }
     fn initial_output(&self) {
-        self.domain().send_to_main_once(msg::W2M::InitialOutput);
+        self.domain().send_to_main_once(W2M::InitialOutput);
     }
 }
