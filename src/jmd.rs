@@ -33,6 +33,14 @@ where
             threads: Vec::new(),
         }
     }
+    pub fn run(&mut self, num_threads: usize, f: fn(Simulation<T, A>) -> ()) {
+        self.setup(num_threads);
+        for t in 0..self.threads.len() {
+            self.send(t, M2W::Run(f));
+        }
+        self.manage_comm();
+    }
+
     fn setup(&mut self, num_threads: usize) {
         for _ in 0..num_threads {
             let (tx2, rx2) = mpsc::channel();
@@ -176,12 +184,5 @@ where
                 }
             }
         }
-    }
-    pub fn run(&mut self, num_threads: usize, f: fn(Simulation<T, A>) -> ()) {
-        self.setup(num_threads);
-        for t in 0..self.threads.len() {
-            self.send(t, M2W::Run(f));
-        }
-        self.manage_comm();
     }
 }
