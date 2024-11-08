@@ -89,7 +89,7 @@ impl<T: AtomType> AtomicPotentialTrait<T> for LJCut {
             let posi = &atoms.positions[i];
 
             for j in &neighbor_list.neighbors()[i] {
-                if i == *j {
+                if atoms.ids[i] == atoms.ids[*j] {
                     continue;
                 }
                 // U(r) = 4 eps ((sig/r)^12 - (sig/r)^6) - const
@@ -131,7 +131,7 @@ impl<T: AtomType> AtomicPotentialTrait<T> for LJCut {
             let posi = &atoms.positions[i];
 
             for j in &neighbor_list.neighbors()[i] {
-                if i == *j {
+                if atoms.ids[i] == atoms.ids[*j] {
                     continue;
                 }
                 // U(r) = 4 eps ((sig/r)^12 - (sig/r)^6) - const
