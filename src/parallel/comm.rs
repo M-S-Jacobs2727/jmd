@@ -102,9 +102,7 @@ where
 {
     let atom_idxs = collect_comm_atoms(sim, &direction);
     let ids: Vec<usize> = atom_idxs.iter().map(|i| sim.atoms.ids[*i]).collect();
-    sim.domain()
-        .send(AtomMessage::Idxs(ids), direction)
-        .unwrap();
+    sim.domain().send(AtomMessage::Idxs(ids), direction);
 
     sim.remove_idxs(atom_idxs);
 }
@@ -264,12 +262,9 @@ where
         send_forces.push(sim.forces()[j].clone());
     }
 
+    sim.domain().send(AtomMessage::Idxs(ids.clone()), direction);
     sim.domain()
-        .send(AtomMessage::Idxs(ids.clone()), direction)
-        .expect("Disconnect error");
-    sim.domain()
-        .send(AtomMessage::Float3(send_forces), direction)
-        .expect("Disconnect error");
+        .send(AtomMessage::Float3(send_forces), direction);
     ids
 }
 

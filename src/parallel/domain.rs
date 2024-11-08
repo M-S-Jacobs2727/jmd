@@ -290,11 +290,7 @@ impl<'a, T: AtomType, A: atomic::AtomicPotentialTrait<T>> Domain<'a, T, A> {
     pub fn receive(&self) -> AtomMessage {
         self.receiver.recv().expect("Disconnect error")
     }
-    pub fn send(
-        &self,
-        value: AtomMessage,
-        neighbor: Direction,
-    ) -> Result<(), mpsc::SendError<AtomMessage>> {
+    pub fn send(&self, value: AtomMessage, neighbor: Direction) {
         let n = match neighbor {
             Direction::Xlo => self.procs.xlo(),
             Direction::Xhi => self.procs.xhi(),
@@ -303,9 +299,8 @@ impl<'a, T: AtomType, A: atomic::AtomicPotentialTrait<T>> Domain<'a, T, A> {
             Direction::Zlo => self.procs.zlo(),
             Direction::Zhi => self.procs.zhi(),
         };
-        match n {
-            Some(s) => s.send(value),
-            None => Ok(()),
+        if let Some(s) = n {
+            s.send(value).expect("Disconnect error");
         }
     }
     pub(crate) fn send_to_main(&self, message: W2M<T>) {
