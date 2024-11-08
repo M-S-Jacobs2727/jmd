@@ -2,6 +2,7 @@ use super::*;
 use crate::{
     atom_type::AtomType,
     atomic::AtomicPotentialTrait,
+    atoms::Atom,
     region::{Rect, Region},
     simulation::Simulation,
     utils::Direction,
@@ -47,6 +48,12 @@ where
     T: AtomType,
     A: AtomicPotentialTrait<T>,
 {
+    // delete all ghost atoms
+    sim.atoms.ids.resize(sim.atoms.nlocal, 0);
+    sim.atoms.types.resize(sim.atoms.nlocal, 0);
+    sim.atoms.positions.resize(sim.atoms.nlocal, [0.0; 3]);
+    sim.atoms.velocities.resize(sim.atoms.nlocal, [0.0; 3]);
+
     // x-direction
     send_forward_comm(sim, Direction::Xlo);
     recv_forward_comm(sim);
@@ -175,18 +182,12 @@ where
     T: AtomType,
     A: AtomicPotentialTrait<T>,
 {
-    let id_msg = sim.domain().receive();
-    let type_msg = sim.domain().receive();
-    let pos_msg = sim.domain().receive();
-    let vel_msg = sim.domain().receive();
-    match (id_msg, type_msg, pos_msg, vel_msg) {
-        (
-            AtomMessage::Idxs(ids),
-            AtomMessage::Types(types),
-            AtomMessage::Float3(positions),
-            AtomMessage::Float3(velocities),
-        ) => {
-            update_ghost_atoms(sim, ids, types, positions, velocities);
+    let msg = sim.domain().receive();
+    match msg {
+        AtomMessage::Atom(atoms) => {
+            for atom in atoms {
+                sim.atoms.update_or_push(atom);
+            }
         }
         _ => panic!("Invalid message"),
     };
@@ -278,42 +279,24 @@ where
     A: AtomicPotentialTrait<T>,
 {
     let idxs = gather_owned_idxs(sim, &sim.domain().get_inner_rect(&direction, sim.nl()));
-    fn gather<T: Copy>(idxs: &Vec<usize>, vec: &Vec<T>) -> Vec<T> {
-        idxs.iter().map(|i| vec[*i]).collect()
-    }
-    let send = |m| sim.domain().send(m, direction).expect("Disconnect error");
+    let atoms: Vec<Atom> = sim
+        .atoms
+        .ids
+        .iter()
+        .enumerate()
+        .filter_map(|(i, id)| {
+            if idxs.contains(&i) {
+                Some(Atom {
+                    id: *id,
+                    type_: sim.atoms.types[i],
+                    position: sim.atoms.positions[i],
+                    velocity: sim.atoms.velocities[i],
+                })
+            } else {
+                None
+            }
+        })
+        .collect();
 
-    let types: Vec<usize> = gather(&idxs, &sim.atoms.types);
-    let positions: Vec<[f64; 3]> = gather(&idxs, &sim.atoms.positions);
-    let velocities: Vec<[f64; 3]> = gather(&idxs, &sim.atoms.velocities);
-
-    send(AtomMessage::Idxs(idxs));
-    send(AtomMessage::Types(types));
-    send(AtomMessage::Float3(positions));
-    send(AtomMessage::Float3(velocities));
-}
-
-fn update_ghost_atoms<T, A>(
-    sim: &mut Simulation<T, A>,
-    mut ids: Vec<usize>,
-    mut types: Vec<usize>,
-    mut positions: Vec<[f64; 3]>,
-    mut velocities: Vec<[f64; 3]>,
-) where
-    T: AtomType,
-    A: AtomicPotentialTrait<T>,
-{
-    assert_eq!(ids.len(), types.len(), "Invalid communication");
-    assert_eq!(ids.len(), positions.len(), "Invalid communication");
-    assert_eq!(ids.len(), velocities.len(), "Invalid communication");
-
-    sim.atoms.ids.resize(sim.atoms.nlocal, 0);
-    sim.atoms.types.resize(sim.atoms.nlocal, 0);
-    sim.atoms.positions.resize(sim.atoms.nlocal, [0.0; 3]);
-    sim.atoms.velocities.resize(sim.atoms.nlocal, [0.0; 3]);
-
-    sim.atoms.ids.append(&mut ids);
-    sim.atoms.types.append(&mut types);
-    sim.atoms.positions.append(&mut positions);
-    sim.atoms.velocities.append(&mut velocities);
+    sim.domain().send(AtomMessage::Atom(atoms), direction);
 }

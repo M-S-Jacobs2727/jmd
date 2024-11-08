@@ -2,6 +2,13 @@ use std::fmt::Debug;
 
 use crate::atom_type::AtomType;
 
+pub(crate) struct Atom {
+    pub(crate) id: usize,
+    pub(crate) type_: usize,
+    pub(crate) position: [f64; 3],
+    pub(crate) velocity: [f64; 3],
+}
+
 /// Atom properties during simulation, not including forces
 #[derive(Debug)]
 pub struct Atoms<T: AtomType> {
@@ -90,5 +97,22 @@ impl<T: AtomType> Atoms<T> {
         self.velocities[i][0] += increment[0];
         self.velocities[i][1] += increment[1];
         self.velocities[i][2] += increment[2];
+    }
+    pub(crate) fn update_or_push(&mut self, atom: Atom) {
+        let idx = self.ids.iter().position(|id| *id == atom.id);
+        match idx {
+            Some(i) => {
+                self.ids[i] = atom.id;
+                self.types[i] = atom.type_;
+                self.positions[i] = atom.position;
+                self.velocities[i] = atom.velocity;
+            }
+            None => {
+                self.ids.push(atom.id);
+                self.types.push(atom.type_);
+                self.positions.push(atom.position);
+                self.velocities.push(atom.velocity);
+            }
+        };
     }
 }

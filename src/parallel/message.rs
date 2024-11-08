@@ -3,19 +3,20 @@ use std::{sync::mpsc, thread};
 use crate::{
     atom_type::AtomType,
     atomic::AtomicPotentialTrait,
-    atoms::Atoms,
+    atoms::{Atom, Atoms},
     container::Container,
     output::{OutputSpec, Value},
     simulation::Simulation,
 };
 
 /// Message between procs communicating atom info
-pub enum AtomMessage {
+pub(crate) enum AtomMessage {
     Float3(Vec<[f64; 3]>),
     Float(Vec<f64>),
     Int3(Vec<[i32; 3]>),
     Types(Vec<usize>),
     Idxs(Vec<usize>),
+    Atom(Vec<Atom>),
 }
 
 /// Worker-to-Manager messages
