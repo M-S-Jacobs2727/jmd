@@ -5,5 +5,5 @@ where
     T: AtomType,
     A: AtomicPotentialTrait<T>,
 {
-    kinetic_energy::compute(sim) / sim.atoms.num_atoms_global() as f64
+    2.0 / 3.0 * kinetic_energy::compute(sim) / sim.atoms.num_atoms_global() as f64
 }

@@ -271,15 +271,48 @@ where
     /// TODO: move to simulation, make work across multiple processes
     pub fn set_temperature(&mut self, temperature: f64) {
         let atoms = &mut self.atoms;
+        let nlocal = atoms.num_local_atoms();
         let mut rng = rand::thread_rng();
         let dist = rand_distr::Normal::new(0.0, temperature.sqrt()).expect("Invalid temperature");
-        let sqrt_ke: Vec<f64> = dist.sample_iter(&mut rng).take(atoms.nlocal * 3).collect();
-        for i in 0..atoms.nlocal {
+        let sqrt_ke: Vec<f64> = dist.sample_iter(&mut rng).take(nlocal * 3).collect();
+        for i in 0..nlocal {
+            let sqrt_mass = atoms.atom_types[atoms.types[i]].mass().sqrt();
             atoms.velocities[i] = [
-                sqrt_ke[3 * i + 0] / atoms.atom_types[atoms.types[i]].mass().sqrt(),
-                sqrt_ke[3 * i + 1] / atoms.atom_types[atoms.types[i]].mass().sqrt(),
-                sqrt_ke[3 * i + 2] / atoms.atom_types[atoms.types[i]].mass().sqrt(),
+                sqrt_ke[3 * i + 0] / sqrt_mass,
+                sqrt_ke[3 * i + 1] / sqrt_mass,
+                sqrt_ke[3 * i + 2] / sqrt_mass,
             ];
+        }
+        let res = atoms
+            .velocities
+            .iter()
+            .take(nlocal)
+            .map(|v| {
+                let vsq = v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
+                (*v, vsq)
+            })
+            .reduce(|acc, el| {
+                (
+                    [acc.0[0] + el.0[0], acc.0[1] + el.0[1], acc.0[2] + el.0[2]],
+                    acc.1 + el.1,
+                )
+            });
+
+        if let Some((cum_vel, cum_vsq)) = res {
+            let avg_vsq = cum_vsq / nlocal as f64;
+            let factor = (3.0 * temperature / avg_vsq).sqrt();
+            let avg_vel = [
+                cum_vel[0] / nlocal as f64,
+                cum_vel[1] / nlocal as f64,
+                cum_vel[2] / nlocal as f64,
+            ];
+            atoms.velocities.iter_mut().for_each(|v| {
+                *v = [
+                    (v[0] - avg_vel[0]) * factor,
+                    (v[1] - avg_vel[1]) * factor,
+                    (v[2] - avg_vel[2]) * factor,
+                ]
+            });
         }
     }
     /// Remove atoms at the given indices
