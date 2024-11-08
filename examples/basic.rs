@@ -19,6 +19,7 @@ fn run(mut sim: Simulation<Basic, LJCut>) {
     sim.add_atoms(0, coords);
 
     sim.set_temperature(3.0);
+    sim.set_timestep(0.005);
 
     sim.set_nl_skin_distance(0.3);
     sim.set_nl_update(10, 0, true);

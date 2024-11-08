@@ -345,10 +345,14 @@ where
         self.pre_check();
 
         self.initial_output();
+
+        self.forward_comm();
         self.build_neighbor_list();
         self.compute_forces();
 
-        for step in 0..=num_steps {
+        self.output(0);
+
+        for step in 1..=num_steps {
             // Forward communication
             self.pre_forward_comm();
             self.forward_comm();
@@ -484,7 +488,9 @@ where
         if step % self.output.every != 0 {
             return;
         }
-
+        self.output(step);
+    }
+    fn output(&self, step: usize) {
         for v in &self.output.values {
             let value = match v {
                 OutputSpec::Step => Value::Usize(step),
