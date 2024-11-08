@@ -12,6 +12,8 @@ mod potential_energy;
 mod temperature;
 mod total_energy;
 
+use avg_vsq::vsq;
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Compute {
     AvgVsq,

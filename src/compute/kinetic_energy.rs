@@ -5,12 +5,9 @@ where
     T: AtomType,
     A: AtomicPotentialTrait<T>,
 {
-    0.5 * sim
-        .atoms
-        .velocities
+    0.5 * vsq(sim)
         .iter()
         .enumerate()
-        .take(sim.atoms.nlocal)
-        .map(|(i, v)| sim.atoms.mass(i) * (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]))
+        .map(|(i, vsq)| sim.atoms.mass(i) * vsq)
         .sum::<f64>()
 }
