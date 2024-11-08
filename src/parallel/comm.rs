@@ -201,8 +201,15 @@ where
         .iter()
         .skip(sim.nlocal())
         .zip(sim.atoms.positions.iter())
-        .filter(|(_id, pos)| rect.contains(pos))
-        .map(|(id, _pos)| *id)
+        .filter_map(
+            |(&id, pos)| {
+                if rect.contains(pos) {
+                    Some(id)
+                } else {
+                    None
+                }
+            },
+        )
         .collect()
 }
 
@@ -216,8 +223,15 @@ where
         .iter()
         .take(sim.nlocal())
         .enumerate()
-        .filter(|(_id, pos)| rect.contains(pos))
-        .map(|(id, _pos)| id)
+        .filter_map(
+            |(idx, pos)| {
+                if rect.contains(pos) {
+                    Some(idx)
+                } else {
+                    None
+                }
+            },
+        )
         .collect()
 }
 
