@@ -1,4 +1,4 @@
-use jmd_engine::{Atom, Engine, LJCut, LJCutCoeff};
+use jmd_engine::{Engine, LJCut, LJCutCoeff, NeighborListSettings};
 
 #[test]
 fn test_two_atoms_attraction() {
@@ -6,31 +6,14 @@ fn test_two_atoms_attraction() {
     engine.dt = 0.001; // Small timestep for stability
 
     // Create two atoms with initial positions and velocities
-    let atom1 = Atom {
-        position: [-1.0, 0.0, 0.0],
-        velocity: [0.1, 0.0, 0.0],
-        force: [0.0, 0.0, 0.0],
-        mass: 1.0,
-        atom_type: 1,
-        id: 1,
-    };
-
-    let atom2 = Atom {
-        position: [1.0, 0.0, 0.0],
-        velocity: [-0.1, 0.0, 0.0],
-        force: [0.0, 0.0, 0.0],
-        mass: 1.0,
-        atom_type: 1,
-        id: 2,
-    };
+    let coordinates = vec![[-1.0, 0.0, 0.0], [1.0, 0.0, 0.0]];
 
     // Add Lennard-Jones potential
     let mut ljcut = LJCut::new(2.5); // cutoff at 2.5 units
     let coeff = LJCutCoeff::new(1, 1, 1.0, 1.0, 2.5); // epsilon=1.0, sigma=1.0
     ljcut.add_coeff(coeff);
 
-    engine.add_atom(atom1);
-    engine.add_atom(atom2);
+    engine.add_atoms_at_coordinates(coordinates, 1.0, 1);
     engine.add_force(Box::new(ljcut));
 
     // Initial distance between atoms
@@ -41,8 +24,11 @@ fn test_two_atoms_attraction() {
         (dx * dx + dy * dy + dz * dz).sqrt()
     };
 
+    // Add neighbor list
+    let mut neighbor_list = NeighborListSettings::new(0.3, 2.5, 1, 0).neighbor_list(engine.domain);
+
     // Run simulation
-    engine.run(100);
+    engine.run(100, &mut neighbor_list);
 
     // Final distance between atoms
     let final_distance = {
@@ -66,31 +52,14 @@ fn test_two_atoms_drift() {
     engine.dt = 0.001; // Small timestep for stability
 
     // Create two atoms with initial positions but no initial velocities
-    let atom1 = Atom {
-        position: [-1.0, 0.0, 0.0],
-        velocity: [0.0, 0.0, 0.0], // No initial velocity
-        force: [0.0, 0.0, 0.0],
-        mass: 1.0,
-        atom_type: 1,
-        id: 1,
-    };
-
-    let atom2 = Atom {
-        position: [1.0, 0.0, 0.0],
-        velocity: [0.0, 0.0, 0.0], // No initial velocity
-        force: [0.0, 0.0, 0.0],
-        mass: 1.0,
-        atom_type: 1,
-        id: 2,
-    };
+    let coordinates = vec![[-1.0, 0.0, 0.0], [1.0, 0.0, 0.0]];
 
     // Add Lennard-Jones potential
     let mut ljcut = LJCut::new(2.5); // cutoff at 2.5 units
     let coeff = LJCutCoeff::new(1, 1, 1.0, 1.0, 2.5); // epsilon=1.0, sigma=1.0
     ljcut.add_coeff(coeff);
 
-    engine.add_atom(atom1);
-    engine.add_atom(atom2);
+    engine.add_atoms_at_coordinates(coordinates, 1.0, 1);
     engine.add_force(Box::new(ljcut));
 
     // Initial distance should be exactly 2.0
@@ -105,8 +74,11 @@ fn test_two_atoms_drift() {
         "Initial distance should be 2.0"
     );
 
+    // Add neighbor list
+    let mut neighbor_list = NeighborListSettings::new(0.3, 2.5, 1, 0).neighbor_list(engine.domain);
+
     // Run simulation for longer since particles start at rest
-    engine.run(1000);
+    engine.run(1000, &mut neighbor_list);
 
     // Final distance between atoms
     let final_distance = {

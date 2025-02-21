@@ -1,3 +1,4 @@
+#[derive(Debug, Clone, Copy)]
 pub struct Domain {
     pub xlo: f64,
     pub xhi: f64,

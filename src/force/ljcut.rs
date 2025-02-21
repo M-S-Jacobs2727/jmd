@@ -81,7 +81,7 @@ impl LJCut {
 }
 
 impl Force for LJCut {
-    fn apply(&self, atoms: &mut Vec<Atom>, _domain: &Domain) {
+    fn apply(&self, atoms: &mut Vec<Atom>, _domain: &mut Domain) {
         atoms.iter_mut().for_each(|atom| atom.force = [0.0; 3]);
         for i in 0..atoms.len() {
             let type_i = atoms[i].atom_type;

@@ -1,4 +1,4 @@
-use jmd_engine::{Atom, Engine};
+use jmd_engine::{Engine, NeighborListSettings};
 
 #[test]
 fn test_single_atom_velocity() {
@@ -6,19 +6,11 @@ fn test_single_atom_velocity() {
     engine.dt = 0.001; // Set small time step
 
     // Create atom with initial position at origin and velocity in x direction
-    let atom = Atom {
-        position: [0.0, 0.0, 0.0],
-        velocity: [1.0, 0.0, 0.0],
-        force: [0.0, 0.0, 0.0],
-        mass: 1.0,
-        atom_type: 1,
-        id: 1,
-    };
-
-    engine.add_atom(atom);
+    engine.add_atoms_at_coordinates(vec![[0.0, 0.0, 0.0]], 1.0, 1);
+    let mut neighbor_list = NeighborListSettings::new(0.3, 2.5, 1, 0).neighbor_list(engine.domain);
 
     // Run for 10 steps
-    engine.run(10);
+    engine.run(10, &mut neighbor_list);
 
     // Check final position
     // With dt = 0.001 and velocity = 1.0, after 10 steps
