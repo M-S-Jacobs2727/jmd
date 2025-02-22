@@ -135,3 +135,100 @@ impl Constraint for LJCut {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Atom;
+
+    use float_cmp::assert_approx_eq;
+
+    #[test]
+    fn test_ljcut_one_atom() {
+        let mut ljcut = LJCut::new(2.5);
+        ljcut.add_coeff(LJCutCoeff::new(1, 1, 1.0, 1.0, 2.5));
+        let mut atoms = vec![Atom {
+            position: [0.0, 0.0, 0.0],
+            velocity: [0.0, 0.0, 0.0],
+            force: [0.0, 0.0, 0.0],
+            atom_type: 1,
+            id: 0,
+            mass: 1.0,
+        }];
+        ljcut.compute_force(
+            &mut atoms,
+            &mut Domain::new(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0),
+        );
+        assert_approx_eq!(f64, atoms[0].force[0], 0.0, epsilon = 1e-10);
+        assert_approx_eq!(f64, atoms[0].force[1], 0.0, epsilon = 1e-10);
+        assert_approx_eq!(f64, atoms[0].force[2], 0.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_ljcut_one_sigma() {
+        let mut ljcut = LJCut::new(2.5);
+        ljcut.add_coeff(LJCutCoeff::new(1, 1, 1.0, 1.0, 2.5));
+        let mut atoms = vec![
+            Atom {
+                position: [0.0, 0.0, 0.0],
+                velocity: [0.0, 0.0, 0.0],
+                force: [0.0, 0.0, 0.0],
+                atom_type: 1,
+                id: 0,
+                mass: 1.0,
+            },
+            Atom {
+                position: [1.0, 0.0, 0.0],
+                velocity: [0.0, 0.0, 0.0],
+                force: [0.0, 0.0, 0.0],
+                atom_type: 1,
+                id: 1,
+                mass: 1.0,
+            },
+        ];
+        ljcut.compute_force(
+            &mut atoms,
+            &mut Domain::new(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0),
+        );
+        assert_approx_eq!(f64, atoms[0].force[0], -24.0, epsilon = 1e-10);
+        assert_approx_eq!(f64, atoms[0].force[1], 0.0, epsilon = 1e-10);
+        assert_approx_eq!(f64, atoms[0].force[2], 0.0, epsilon = 1e-10);
+        assert_approx_eq!(f64, atoms[1].force[0], 24.0, epsilon = 1e-10);
+        assert_approx_eq!(f64, atoms[1].force[1], 0.0, epsilon = 1e-10);
+        assert_approx_eq!(f64, atoms[1].force[2], 0.0, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn test_ljcut_2v1_6_sigma() {
+        let mut ljcut = LJCut::new(2.5);
+        ljcut.add_coeff(LJCutCoeff::new(1, 1, 1.0, 1.0, 2.5));
+        let mut atoms = vec![
+            Atom {
+                position: [0.0, 0.0, 0.0],
+                velocity: [0.0, 0.0, 0.0],
+                force: [0.0, 0.0, 0.0],
+                atom_type: 1,
+                id: 0,
+                mass: 1.0,
+            },
+            Atom {
+                position: [2.0_f64.powf(1.0 / 6.0), 0.0, 0.0],
+                velocity: [0.0, 0.0, 0.0],
+                force: [0.0, 0.0, 0.0],
+                atom_type: 1,
+                id: 1,
+                mass: 1.0,
+            },
+        ];
+        ljcut.compute_force(
+            &mut atoms,
+            &mut Domain::new(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0),
+        );
+        assert_approx_eq!(f64, atoms[0].force[0], 0.0, epsilon = 1e-10);
+        assert_approx_eq!(f64, atoms[0].force[1], 0.0, epsilon = 1e-10);
+        assert_approx_eq!(f64, atoms[0].force[2], 0.0, epsilon = 1e-10);
+        assert_approx_eq!(f64, atoms[1].force[0], 0.0, epsilon = 1e-10);
+        assert_approx_eq!(f64, atoms[1].force[1], 0.0, epsilon = 1e-10);
+        assert_approx_eq!(f64, atoms[1].force[2], 0.0, epsilon = 1e-10);
+    }
+}
