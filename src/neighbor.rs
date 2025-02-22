@@ -44,9 +44,9 @@ impl NeighborList {
         let cell_size = self.settings.cell_size;
         let cutoff = self.settings.cutoff;
         self.cells_per_axis = [
-            ((domain.xhi - domain.xlo) / cell_size).ceil() as usize,
-            ((domain.yhi - domain.ylo) / cell_size).ceil() as usize,
-            ((domain.zhi - domain.zlo) / cell_size).ceil() as usize,
+            (domain.lx() / cell_size).ceil() as usize,
+            (domain.ly() / cell_size).ceil() as usize,
+            (domain.lz() / cell_size).ceil() as usize,
         ];
         let max_ncells = (cutoff / cell_size).ceil() as i64;
         let cutoff_squared = cutoff * cutoff;

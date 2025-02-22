@@ -32,7 +32,6 @@ impl EngineBuilder {
         self.neighbor_list_settings = Some(settings);
         self
     }
-
     pub fn build(self) -> Result<Engine, &'static str> {
         // Validate parameters
         if self.domain.is_none() {
@@ -52,12 +51,19 @@ impl EngineBuilder {
 }
 
 impl Engine {
+    pub fn atoms(&self) -> &Vec<Atom> {
+        &self.atoms
+    }
+    pub fn atom(&self, id: usize) -> &Atom {
+        &self.atoms[id]
+    }
+
     /// Adds a force to the engine.
     ///
     /// # Arguments
     ///
     /// * `force` - A force to be added to the engine.
-    pub fn add_force(&mut self, force: Box<dyn Constraint>) {
+    pub fn add_constraint(&mut self, force: Box<dyn Constraint>) {
         self.constraints.push(force);
     }
     /// Adds atoms at specified coordinates.

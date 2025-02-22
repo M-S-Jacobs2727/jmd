@@ -1,9 +1,12 @@
-use jmd_engine::{Engine, LJCut, LJCutCoeff, NeighborListSettings};
+use jmd_engine::{Domain, EngineBuilder, LJCut, LJCutCoeff, NeighborListSettings, VelocityVerlet};
 
 #[test]
 fn test_two_atoms_attraction() {
-    let mut engine = Engine::new();
-    engine.dt = 0.001; // Small timestep for stability
+    let mut engine = EngineBuilder::new()
+        .with_domain(Domain::new(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0))
+        .with_neighbor_list_settings(NeighborListSettings::new(0.3, 2.5, 1, 0))
+        .build()
+        .unwrap();
 
     // Create two atoms with initial positions and velocities
     let coordinates = vec![[-1.0, 0.0, 0.0], [1.0, 0.0, 0.0]];
@@ -14,27 +17,25 @@ fn test_two_atoms_attraction() {
     ljcut.add_coeff(coeff);
 
     engine.add_atoms_at_coordinates(coordinates, 1.0, 1);
-    engine.add_force(Box::new(ljcut));
+    engine.add_constraint(Box::new(ljcut));
+    engine.add_constraint(Box::new(VelocityVerlet::new(0.001)));
 
     // Initial distance between atoms
     let initial_distance = {
-        let dx = engine.atoms[1].position[0] - engine.atoms[0].position[0];
-        let dy = engine.atoms[1].position[1] - engine.atoms[0].position[1];
-        let dz = engine.atoms[1].position[2] - engine.atoms[0].position[2];
+        let dx = engine.atom(1).position[0] - engine.atom(0).position[0];
+        let dy = engine.atom(1).position[1] - engine.atom(0).position[1];
+        let dz = engine.atom(1).position[2] - engine.atom(0).position[2];
         (dx * dx + dy * dy + dz * dz).sqrt()
     };
 
-    // Add neighbor list
-    let mut neighbor_list = NeighborListSettings::new(0.3, 2.5, 1, 0).neighbor_list(engine.domain);
-
     // Run simulation
-    engine.run(100, &mut neighbor_list);
+    engine.run(100);
 
     // Final distance between atoms
     let final_distance = {
-        let dx = engine.atoms[1].position[0] - engine.atoms[0].position[0];
-        let dy = engine.atoms[1].position[1] - engine.atoms[0].position[1];
-        let dz = engine.atoms[1].position[2] - engine.atoms[0].position[2];
+        let dx = engine.atom(1).position[0] - engine.atom(0).position[0];
+        let dy = engine.atom(1).position[1] - engine.atom(0).position[1];
+        let dz = engine.atom(1).position[2] - engine.atom(0).position[2];
         (dx * dx + dy * dy + dz * dz).sqrt()
     };
 
@@ -48,8 +49,11 @@ fn test_two_atoms_attraction() {
 
 #[test]
 fn test_two_atoms_drift() {
-    let mut engine = Engine::new();
-    engine.dt = 0.001; // Small timestep for stability
+    let mut engine = EngineBuilder::new()
+        .with_domain(Domain::new(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0))
+        .with_neighbor_list_settings(NeighborListSettings::new(0.3, 2.5, 1, 0))
+        .build()
+        .unwrap();
 
     // Create two atoms with initial positions but no initial velocities
     let coordinates = vec![[-1.0, 0.0, 0.0], [1.0, 0.0, 0.0]];
@@ -60,13 +64,14 @@ fn test_two_atoms_drift() {
     ljcut.add_coeff(coeff);
 
     engine.add_atoms_at_coordinates(coordinates, 1.0, 1);
-    engine.add_force(Box::new(ljcut));
+    engine.add_constraint(Box::new(ljcut));
+    engine.add_constraint(Box::new(VelocityVerlet::new(0.001)));
 
     // Initial distance should be exactly 2.0
     let initial_distance = {
-        let dx = engine.atoms[1].position[0] - engine.atoms[0].position[0];
-        let dy = engine.atoms[1].position[1] - engine.atoms[0].position[1];
-        let dz = engine.atoms[1].position[2] - engine.atoms[0].position[2];
+        let dx = engine.atom(1).position[0] - engine.atom(0).position[0];
+        let dy = engine.atom(1).position[1] - engine.atom(0).position[1];
+        let dz = engine.atom(1).position[2] - engine.atom(0).position[2];
         (dx * dx + dy * dy + dz * dz).sqrt()
     };
     assert!(
@@ -74,17 +79,14 @@ fn test_two_atoms_drift() {
         "Initial distance should be 2.0"
     );
 
-    // Add neighbor list
-    let mut neighbor_list = NeighborListSettings::new(0.3, 2.5, 1, 0).neighbor_list(engine.domain);
-
     // Run simulation for longer since particles start at rest
-    engine.run(1000, &mut neighbor_list);
+    engine.run(1000);
 
     // Final distance between atoms
     let final_distance = {
-        let dx = engine.atoms[1].position[0] - engine.atoms[0].position[0];
-        let dy = engine.atoms[1].position[1] - engine.atoms[0].position[1];
-        let dz = engine.atoms[1].position[2] - engine.atoms[0].position[2];
+        let dx = engine.atom(1).position[0] - engine.atom(0).position[0];
+        let dy = engine.atom(1).position[1] - engine.atom(0).position[1];
+        let dz = engine.atom(1).position[2] - engine.atom(0).position[2];
         (dx * dx + dy * dy + dz * dz).sqrt()
     };
 
