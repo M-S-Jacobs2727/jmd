@@ -75,7 +75,11 @@ impl NeighborList {
     pub fn generate(&mut self, atoms: &[Atom]) {
         self.cells.clear();
         self.neighbors.clear();
-        self.cells.resize(atoms.len(), vec![]);
+
+        self.cells.resize(
+            self.cells_per_axis[0] * self.cells_per_axis[1] * self.cells_per_axis[2],
+            vec![],
+        );
         self.neighbors.resize(atoms.len(), vec![]);
         for atom in atoms {
             let cell_index = self.get_cell_index(atom.position);

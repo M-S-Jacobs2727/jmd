@@ -27,4 +27,13 @@ impl Domain {
             && position[2] >= self.zlo
             && position[2] <= self.zhi
     }
+
+    pub fn set_bounds(&mut self, vec: Vec<(f64, f64)>) {
+        self.xlo = vec[0].0;
+        self.xhi = vec[0].1;
+        self.ylo = vec[1].0;
+        self.yhi = vec[1].1;
+        self.zlo = vec[2].0;
+        self.zhi = vec[2].1;
+    }
 }

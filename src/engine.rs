@@ -1,27 +1,72 @@
 use crate::atom::Atom;
+use crate::constraint::Constraint;
 use crate::domain::Domain;
-use crate::force::Force;
-use crate::neighbor::NeighborList;
+use crate::neighbor::{NeighborList, NeighborListSettings};
+
+pub struct EngineBuilder {
+    domain: Option<Domain>,
+    neighbor_list_settings: Option<NeighborListSettings>,
+}
 
 pub struct Engine {
-    pub domain: Domain,
-    pub atoms: Vec<Atom>,
-    pub forces: Vec<Box<dyn Force>>,
-    pub dt: f64,
+    domain: Domain,
+    atoms: Vec<Atom>,
+    constraints: Vec<Box<dyn Constraint>>,
+    neighbor_list: NeighborList,
+}
+
+impl EngineBuilder {
+    pub fn new() -> Self {
+        Self {
+            domain: None,
+            neighbor_list_settings: None,
+        }
+    }
+
+    pub fn with_domain(mut self, domain: Domain) -> Self {
+        self.domain = Some(domain);
+        self
+    }
+
+    pub fn with_neighbor_list_settings(mut self, settings: NeighborListSettings) -> Self {
+        self.neighbor_list_settings = Some(settings);
+        self
+    }
+
+    pub fn build(self) -> Result<Engine, &'static str> {
+        // Validate parameters
+        if self.domain.is_none() {
+            return Err("Domain must be set");
+        }
+        if self.neighbor_list_settings.is_none() {
+            return Err("Neighbor list settings must be set");
+        }
+
+        Ok(Engine {
+            domain: self.domain.unwrap(),
+            atoms: Vec::new(),
+            constraints: Vec::new(),
+            neighbor_list: NeighborList::new(self.neighbor_list_settings.unwrap()),
+        })
+    }
 }
 
 impl Engine {
-    pub fn new() -> Self {
-        Self {
-            domain: Domain::new(),
-            atoms: Vec::new(),
-            forces: Vec::new(),
-            dt: 0.0,
-        }
+    /// Adds a force to the engine.
+    ///
+    /// # Arguments
+    ///
+    /// * `force` - A force to be added to the engine.
+    pub fn add_force(&mut self, force: Box<dyn Constraint>) {
+        self.constraints.push(force);
     }
-    pub fn add_force(&mut self, force: Box<dyn Force>) {
-        self.forces.push(force);
-    }
+    /// Adds atoms at specified coordinates.
+    ///
+    /// # Arguments
+    ///
+    /// * `positions` - A vector of coordinates for the atoms.
+    /// * `mass` - The mass of the atoms.
+    /// * `atom_type` - The type of the atoms.
     pub fn add_atoms_at_coordinates(
         &mut self,
         positions: Vec<[f64; 3]>,
@@ -41,34 +86,88 @@ impl Engine {
             });
         }
     }
-    pub fn run(&mut self, steps: usize, neighbor_list: &mut NeighborList) {
-        neighbor_list.generate(&self.atoms);
-        for _ in 0..steps {
-            self.compute_half_step_velocity();
-            self.compute_position();
+    /// Runs the engine for a specified number of steps.
+    ///
+    /// # Arguments
+    ///
+    /// * `steps` - The number of steps to run the engine for.
+    pub fn run(&mut self, steps: usize) {
+        self.forward_communication();
+        self.build_neighbor_list(0);
+        self.compute_force();
+        self.reverse_communication();
+        self.output(0);
+        for step in 1..=steps {
+            self.pre_forward_communication();
+            self.forward_communication();
+            self.post_forward_communication();
+
+            self.build_neighbor_list(step);
+
+            self.pre_compute_force();
             self.compute_force();
-            self.compute_half_step_velocity();
-            self.output();
+
+            self.pre_reverse_communication();
+            self.reverse_communication();
+            self.post_reverse_communication();
+
+            self.output(step);
         }
     }
-    fn compute_half_step_velocity(&mut self) {
-        for atom in self.atoms.iter_mut() {
-            atom.velocity[0] += atom.force[0] * 0.5 * self.dt;
-            atom.velocity[1] += atom.force[1] * 0.5 * self.dt;
-            atom.velocity[2] += atom.force[2] * 0.5 * self.dt;
+    /// Iterates velocities and positions before forward communication.
+    /// Also includes other events occuring before forward communication.
+    fn pre_forward_communication(&mut self) {
+        for constraint in &mut self.constraints {
+            constraint.pre_forward_communication(&mut self.atoms, &mut self.domain);
         }
     }
-    fn compute_position(&mut self) {
-        for atom in self.atoms.iter_mut() {
-            atom.position[0] += atom.velocity[0] * self.dt;
-            atom.position[1] += atom.velocity[1] * self.dt;
-            atom.position[2] += atom.velocity[2] * self.dt;
+    /// Forward communication of positions and velocities.
+    fn forward_communication(&mut self) {
+        for constraint in &mut self.constraints {
+            constraint.forward_communication(&mut self.atoms, &mut self.domain);
+        }
+    }
+    /// Events occuring after position and velocity communication.
+    fn post_forward_communication(&mut self) {
+        for constraint in &mut self.constraints {
+            constraint.post_forward_communication(&mut self.atoms, &mut self.domain);
+        }
+    }
+    /// Builds the neighbor list if the step is a multiple of the update frequency.
+    fn build_neighbor_list(&mut self, step: usize) {
+        if step % self.neighbor_list.settings.update_every == 0 {
+            self.neighbor_list.generate(&self.atoms);
+        }
+    }
+    /// Events occuring before force computation.
+    fn pre_compute_force(&mut self) {
+        for constraint in &mut self.constraints {
+            constraint.pre_compute_force(&mut self.atoms, &mut self.domain);
+        }
+    }
+    /// Iterates velocities before reverse communication.
+    /// Also includes other events occuring before reverse communication.
+    fn pre_reverse_communication(&mut self) {
+        for constraint in &mut self.constraints {
+            constraint.pre_reverse_communication(&mut self.atoms, &mut self.domain);
+        }
+    }
+    /// Reverse communication of forces.
+    fn reverse_communication(&mut self) {
+        for constraint in &mut self.constraints {
+            constraint.reverse_communication(&mut self.atoms, &mut self.domain);
+        }
+    }
+    /// Events occuring after reverse communication.
+    fn post_reverse_communication(&mut self) {
+        for constraint in &mut self.constraints {
+            constraint.post_reverse_communication(&mut self.atoms, &mut self.domain);
         }
     }
     fn compute_force(&mut self) {
-        for force in &mut self.forces {
-            force.apply(&mut self.atoms, &mut self.domain);
+        for constraint in &mut self.constraints {
+            constraint.compute_force(&mut self.atoms, &mut self.domain);
         }
     }
-    fn output(&self) {}
+    fn output(&self, step: usize) {}
 }
