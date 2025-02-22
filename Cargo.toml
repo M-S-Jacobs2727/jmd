@@ -4,5 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+float-cmp = "0.10.0"
 rand = "0.9.0"
 rand_distr = "0.5.0"
