@@ -1,6 +1,6 @@
 use crate::{Atom, Domain};
 
-use super::Force;
+use crate::constraint::Constraint;
 
 pub struct LJCut {
     pub force_cutoff: f64,
@@ -78,10 +78,33 @@ impl LJCut {
             .iter()
             .find(|coeff| coeff.type_i == type_i && coeff.type_j == type_j)
     }
+    pub fn energy(&self, atoms: &Vec<Atom>, _domain: &Domain) -> f64 {
+        let mut energy = 0.0;
+        for i in 0..atoms.len() {
+            let type_i = atoms[i].atom_type;
+            for j in i + 1..atoms.len() {
+                let type_j = atoms[j].atom_type;
+                let r = [
+                    atoms[i].position[0] - atoms[j].position[0],
+                    atoms[i].position[1] - atoms[j].position[1],
+                    atoms[i].position[2] - atoms[j].position[2],
+                ];
+                let r2 = r[0] * r[0] + r[1] * r[1] + r[2] * r[2];
+                if let Some(coeff) = self.get_coeff(type_i, type_j) {
+                    if r2 > coeff.cutoff_sq {
+                        continue;
+                    }
+                    let r6 = r2 * r2 * r2;
+                    energy += coeff.four_epsilon_sigma6 * (coeff.sigma6 / r6 - 1.0) / r6;
+                }
+            }
+        }
+        energy
+    }
 }
 
-impl Force for LJCut {
-    fn apply(&self, atoms: &mut Vec<Atom>, _domain: &mut Domain) {
+impl Constraint for LJCut {
+    fn compute_force(&mut self, atoms: &mut Vec<Atom>, _domain: &mut Domain) {
         atoms.iter_mut().for_each(|atom| atom.force = [0.0; 3]);
         for i in 0..atoms.len() {
             let type_i = atoms[i].atom_type;
@@ -110,29 +133,5 @@ impl Force for LJCut {
                 }
             }
         }
-    }
-
-    fn energy(&self, atoms: &Vec<Atom>, _domain: &Domain) -> f64 {
-        let mut energy = 0.0;
-        for i in 0..atoms.len() {
-            let type_i = atoms[i].atom_type;
-            for j in i + 1..atoms.len() {
-                let type_j = atoms[j].atom_type;
-                let r = [
-                    atoms[i].position[0] - atoms[j].position[0],
-                    atoms[i].position[1] - atoms[j].position[1],
-                    atoms[i].position[2] - atoms[j].position[2],
-                ];
-                let r2 = r[0] * r[0] + r[1] * r[1] + r[2] * r[2];
-                if let Some(coeff) = self.get_coeff(type_i, type_j) {
-                    if r2 > coeff.cutoff_sq {
-                        continue;
-                    }
-                    let r6 = r2 * r2 * r2;
-                    energy += coeff.four_epsilon_sigma6 * (coeff.sigma6 / r6 - 1.0) / r6;
-                }
-            }
-        }
-        energy
     }
 }
