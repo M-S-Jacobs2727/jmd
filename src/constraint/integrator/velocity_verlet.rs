@@ -1,5 +1,5 @@
 use crate::constraint::Constraint;
-use crate::{Atom, Domain};
+use crate::{Atom, System};
 
 pub struct VelocityVerlet {
     pub dt: f64,
@@ -26,11 +26,11 @@ impl VelocityVerlet {
 }
 
 impl Constraint for VelocityVerlet {
-    fn pre_forward_communication(&mut self, atoms: &mut Vec<Atom>, _domain: &mut Domain) {
-        self.compute_half_step_velocity(atoms);
-        self.compute_position(atoms);
+    fn pre_forward_communication(&mut self, system: &mut System) {
+        self.compute_half_step_velocity(&mut system.atoms);
+        self.compute_position(&mut system.atoms);
     }
-    fn pre_reverse_communication(&mut self, atoms: &mut Vec<Atom>, _domain: &mut Domain) {
-        self.compute_half_step_velocity(atoms);
+    fn pre_reverse_communication(&mut self, system: &mut System) {
+        self.compute_half_step_velocity(&mut system.atoms);
     }
 }

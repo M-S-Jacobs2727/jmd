@@ -1,78 +1,65 @@
-use crate::Atom;
+use crate::{Atom, Domain, System};
+
+use super::Constraint;
 
 pub struct PeriodicBoundary {
-    x: Option<(f64, f64)>,
-    y: Option<(f64, f64)>,
-    z: Option<(f64, f64)>,
+    x: bool,
+    y: bool,
+    z: bool,
 }
 
 impl PeriodicBoundary {
-    pub fn new(x: Option<(f64, f64)>, y: Option<(f64, f64)>, z: Option<(f64, f64)>) -> Self {
-        if let Some((xlo, xhi)) = x {
-            if xlo >= xhi {
-                panic!("xlo must be less than xhi");
-            }
-        }
-        if let Some((ylo, yhi)) = y {
-            if ylo >= yhi {
-                panic!("ylo must be less than yhi");
-            }
-        }
-        if let Some((zlo, zhi)) = z {
-            if zlo >= zhi {
-                panic!("zlo must be less than zhi");
-            }
-        }
+    pub fn new(x: bool, y: bool, z: bool) -> Self {
         Self { x, y, z }
     }
-    pub fn x(&self) -> Option<(f64, f64)> {
+    pub fn x(&self) -> bool {
         self.x
     }
-    pub fn y(&self) -> Option<(f64, f64)> {
+    pub fn y(&self) -> bool {
         self.y
     }
-    pub fn z(&self) -> Option<(f64, f64)> {
+    pub fn z(&self) -> bool {
         self.z
     }
-    pub fn apply(&self, atoms: &mut Vec<Atom>) {
-        let lx = if let Some((xlo, xhi)) = self.x {
-            xhi - xlo
+    pub fn wrap_atoms_across_boundaries(&self, atoms: &mut Vec<Atom>, domain: &Domain) {
+        let lx = if self.x {
+            domain.xhi() - domain.xlo()
         } else {
             0.0
         };
-        let ly = if let Some((ylo, yhi)) = self.y {
-            yhi - ylo
+        let ly = if self.y {
+            domain.yhi() - domain.ylo()
         } else {
             0.0
         };
-        let lz = if let Some((zlo, zhi)) = self.z {
-            zhi - zlo
+        let lz = if self.z {
+            domain.zhi() - domain.zlo()
         } else {
             0.0
         };
         for atom in atoms.iter_mut() {
-            if let Some((xlo, xhi)) = self.x {
-                if atom.position[0] < xlo {
-                    atom.position[0] += lx;
-                } else if atom.position[0] > xhi {
-                    atom.position[0] -= lx;
-                }
+            if atom.position[0] < domain.xlo() {
+                atom.position[0] += lx;
+            } else if atom.position[0] > domain.xhi() {
+                atom.position[0] -= lx;
             }
-            if let Some((ylo, yhi)) = self.y {
-                if atom.position[1] < ylo {
-                    atom.position[1] += ly;
-                } else if atom.position[1] > yhi {
-                    atom.position[1] -= ly;
-                }
+            if atom.position[1] < domain.ylo() {
+                atom.position[1] += ly;
+            } else if atom.position[1] > domain.yhi() {
+                atom.position[1] -= ly;
             }
-            if let Some((zlo, zhi)) = self.z {
-                if atom.position[2] < zlo {
-                    atom.position[2] += lz;
-                } else if atom.position[2] > zhi {
-                    atom.position[2] -= lz;
-                }
+            if atom.position[2] < domain.zlo() {
+                atom.position[2] += lz;
+            } else if atom.position[2] > domain.zhi() {
+                atom.position[2] -= lz;
             }
         }
+    }
+}
+
+impl Constraint for PeriodicBoundary {
+    fn post_forward_communication(&mut self, system: &mut System) {
+        self.wrap_atoms_across_boundaries(&mut system.atoms, &system.domain);
     }
 }
 
@@ -102,8 +89,9 @@ mod tests {
                 id: 1,
             },
         ];
-        let periodic_boundary = PeriodicBoundary::new(Some((0.0, 1.0)), None, None);
-        periodic_boundary.apply(&mut atoms);
+        let mut domain = Domain::new(0.0, 1.0, 0.0, 1.0, 0.0, 1.0);
+        let periodic_boundary = PeriodicBoundary::new(true, false, false);
+        periodic_boundary.wrap_atoms_across_boundaries(&mut atoms, &mut domain);
         assert_approx_eq!(f64, atoms[0].position[0], 0.0, epsilon = 1e-10);
         assert_approx_eq!(f64, atoms[1].position[0], 0.1, epsilon = 1e-10);
     }
