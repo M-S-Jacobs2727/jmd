@@ -1,4 +1,10 @@
 #[derive(Debug, Clone, Copy)]
+pub struct SimulationBox {
+    domain: Domain,
+    boundary_conditions: [BoundaryCondition; 3],
+}
+
+#[derive(Debug, Clone, Copy)]
 pub struct Domain {
     xlo: f64,
     xhi: f64,
@@ -6,6 +12,47 @@ pub struct Domain {
     yhi: f64,
     zlo: f64,
     zhi: f64,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum BoundaryCondition {
+    Periodic,
+    Fixed(f64, f64),
+    ShrinkWrapped,
+    MinimumShrinkWrapped(f64, f64),
+}
+
+impl SimulationBox {
+    pub fn new(domain: Domain, boundary_conditions: [BoundaryCondition; 3]) -> Self {
+        for boundary_condition in boundary_conditions {
+            if let BoundaryCondition::Fixed(min, max) = boundary_condition {
+                if min >= max {
+                    panic!("Invalid boundary condition: min >= max");
+                }
+            }
+            if let BoundaryCondition::MinimumShrinkWrapped(min, max) = boundary_condition {
+                if min >= max {
+                    panic!("Invalid boundary condition: min >= max");
+                }
+            }
+        }
+        Self {
+            domain,
+            boundary_conditions,
+        }
+    }
+    pub fn domain(&self) -> &Domain {
+        &self.domain
+    }
+    pub fn boundary_conditions(&self) -> &[BoundaryCondition; 3] {
+        &self.boundary_conditions
+    }
+    pub fn is_periodic(&self, direction: usize) -> bool {
+        if direction > 2 {
+            panic!("Invalid direction: {}", direction);
+        }
+        self.boundary_conditions[direction].is_periodic()
+    }
 }
 
 impl Domain {
@@ -65,5 +112,11 @@ impl Domain {
     }
     pub fn zhi(&self) -> f64 {
         self.zhi
+    }
+}
+
+impl BoundaryCondition {
+    pub fn is_periodic(&self) -> bool {
+        matches!(self, BoundaryCondition::Periodic)
     }
 }
