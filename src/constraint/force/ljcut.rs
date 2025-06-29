@@ -142,7 +142,7 @@ impl Constraint for LJCut {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{NeighborListSettings, SystemBuilder};
+    use crate::{BoundaryCondition, NeighborListSettings, SimulationBox, SystemBuilder};
 
     use float_cmp::assert_approx_eq;
 
@@ -152,7 +152,14 @@ mod tests {
         ljcut.add_coeff(LJCutCoeff::new(1, 1, 1.0, 1.0, 2.5));
         let positions = vec![[0.0, 0.0, 0.0]];
         let mut system = SystemBuilder::new()
-            .with_domain(Domain::new(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0))
+            .with_simulation_box(SimulationBox::new(
+                Domain::new(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0),
+                [
+                    BoundaryCondition::Periodic,
+                    BoundaryCondition::Periodic,
+                    BoundaryCondition::Periodic,
+                ],
+            ))
             .with_neighbor_list_settings(NeighborListSettings::new(2.8, 2.5, 1, 0))
             .build();
         system.add_atoms_at_coordinates(positions, 1.0, 1);
@@ -168,7 +175,14 @@ mod tests {
         ljcut.add_coeff(LJCutCoeff::new(1, 1, 1.0, 1.0, 2.5));
         let positions = vec![[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]];
         let mut system = SystemBuilder::new()
-            .with_domain(Domain::new(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0))
+            .with_simulation_box(SimulationBox::new(
+                Domain::new(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0),
+                [
+                    BoundaryCondition::Periodic,
+                    BoundaryCondition::Periodic,
+                    BoundaryCondition::Periodic,
+                ],
+            ))
             .with_neighbor_list_settings(NeighborListSettings::new(2.8, 2.5, 1, 0))
             .build();
         system.add_atoms_at_coordinates(positions, 1.0, 1);
@@ -187,7 +201,14 @@ mod tests {
         ljcut.add_coeff(LJCutCoeff::new(1, 1, 1.0, 1.0, 2.5));
         let positions = vec![[0.0, 0.0, 0.0], [2.0_f64.powf(1.0 / 6.0), 0.0, 0.0]];
         let mut system = SystemBuilder::new()
-            .with_domain(Domain::new(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0))
+            .with_simulation_box(SimulationBox::new(
+                Domain::new(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0),
+                [
+                    BoundaryCondition::Periodic,
+                    BoundaryCondition::Periodic,
+                    BoundaryCondition::Periodic,
+                ],
+            ))
             .with_neighbor_list_settings(NeighborListSettings::new(2.8, 2.5, 1, 0))
             .build();
         system.add_atoms_at_coordinates(positions, 1.0, 1);

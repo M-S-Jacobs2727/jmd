@@ -1,10 +1,8 @@
 mod force;
 mod integrator;
-mod periodic_boundary;
 
 pub use force::{LJCut, LJCutCoeff};
 pub use integrator::VelocityVerlet;
-pub use periodic_boundary::PeriodicBoundary;
 
 use crate::System;
 

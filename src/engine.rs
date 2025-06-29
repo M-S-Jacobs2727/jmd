@@ -6,6 +6,11 @@ pub struct Engine {
 }
 
 impl Engine {
+    pub fn new() -> Self {
+        Self {
+            constraints: vec![],
+        }
+    }
     /// Adds a force to the engine.
     ///
     /// # Arguments
