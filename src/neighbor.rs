@@ -1,4 +1,4 @@
-use crate::{atom::Atom, Domain};
+use crate::{atom::Atoms, Domain};
 
 pub struct NeighborListSettings {
     pub cell_size: f64,
@@ -8,11 +8,11 @@ pub struct NeighborListSettings {
     pub delay_update: usize,
 }
 impl NeighborListSettings {
-    pub fn new(cell_size: f64, cutoff: f64, update_every: usize, delay_update: usize) -> Self {
+    pub fn new(skin_distance: f64, force_cutoff: f64, update_every: usize, delay_update: usize) -> Self {
         Self {
-            cell_size,
-            cutoff,
-            skin: 0.0,
+            cell_size: (force_cutoff + skin_distance) / 2.0,
+            cutoff: force_cutoff,
+            skin: skin_distance,
             update_every,
             delay_update,
         }
@@ -114,15 +114,21 @@ impl NeighborList {
             a_squared.partial_cmp(&b_squared).unwrap()
         });
     }
-    pub fn generate(&mut self, atoms: &[Atom]) {
+    pub fn should_rebuild(&self, step: usize, _atoms: &Atoms) -> bool {
+        step % self.settings.update_every == 0
+    }
+    pub fn generate(&mut self, atoms: &Atoms) {
         self.reset_cells();
         self.reset_neighbors(atoms.len());
 
         // Populate cells and neighbors
-        for atom in atoms {
-            let cell_index = self.get_3d_cell_index(atom.position);
+        for i in 0..atoms.len() {
+            let pos = &atoms.positions[i];
+            let id = atoms.ids[i];
+
+            let cell_index = self.get_3d_cell_index(pos);
             let cell_index_1d = self.index_to_1d_cell_index(cell_index);
-            self.cells[cell_index_1d].push(atom.id);
+            self.cells[cell_index_1d].push(id);
 
             for stencil_index in &self.stencil {
                 let neighbor_cell_index = [
@@ -147,8 +153,8 @@ impl NeighborList {
                         continue;
                     }
                     // Add neighbor to the atom's neighbor list
-                    if *neighbor_atom_id != atom.id {
-                        self.neighbors[atom.id].push(*neighbor_atom_id);
+                    if *neighbor_atom_id != id {
+                        self.neighbors[id].push(*neighbor_atom_id);
                     }
                 }
             }
@@ -177,36 +183,40 @@ impl NeighborList {
             + cell_index[1] * self.cells_per_axis[2]
             + cell_index[2]
     }
-    fn get_3d_cell_index(&self, position: [f64; 3]) -> [usize; 3] {
+    fn get_3d_cell_index(&self, position: &[f64; 3]) -> [usize; 3] {
         [
             ((position[0] - self.cell_origin[0]) / self.settings.cell_size) as usize,
             ((position[1] - self.cell_origin[1]) / self.settings.cell_size) as usize,
             ((position[2] - self.cell_origin[2]) / self.settings.cell_size) as usize,
         ]
     }
-    fn get_cell_index(&self, position: [f64; 3]) -> usize {
-        let cell_index = self.get_3d_cell_index(position);
-        self.index_to_1d_cell_index(cell_index)
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Atom, Domain};
+    use crate::{Atoms, BoundaryCondition, Domain, Rect};
 
     #[test]
     fn test_neighbor_list() {
         let mut neighbor_list = NeighborList::new(NeighborListSettings::new(0.3, 2.5, 1, 0));
-        neighbor_list.set_stencil(&Domain::new(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0));
-        let atoms = vec![Atom {
-            id: 1,
-            position: [0.0, 0.0, 0.0],
-            velocity: [0.0, 0.0, 0.0],
-            force: [0.0, 0.0, 0.0],
-            mass: 1.0,
-            atom_type: 1,
-        }];
+        let domain = Domain::new(
+            Rect::new(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0),
+            [
+                BoundaryCondition::Periodic,
+                BoundaryCondition::Periodic,
+                BoundaryCondition::Periodic,
+            ]
+        );
+        neighbor_list.set_stencil(&domain);
+        let atoms = Atoms {
+            ids: vec![1],
+            positions: vec![[0.0, 0.0, 0.0]],
+            velocities: vec![[0.0, 0.0, 0.0]],
+            forces: vec![[0.0, 0.0, 0.0]],
+            masses: vec![1.0],
+            atom_types: vec![1],
+        };
         neighbor_list.generate(&atoms);
         assert_eq!(neighbor_list.neighbors[0], vec![]);
     }
